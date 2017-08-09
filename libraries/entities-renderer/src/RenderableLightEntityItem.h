@@ -17,10 +17,12 @@
 #include "RenderableEntityItem.h"
 
 
-class RenderableLightEntityItem : public LightEntityItem  {
+class RenderableLightEntityItem : public LightEntityItem, public RenderableEntityInterface {
 public:
     static EntityItemPointer factory(const EntityItemID& entityID, const EntityItemProperties& properties);
     RenderableLightEntityItem(const EntityItemID& entityItemID);
+
+    RenderableEntityInterface* getRenderableInterface() override { return this; }
 
     virtual bool supportsDetailedRayIntersection() const override { return true; }
     virtual bool findDetailedRayIntersection(const glm::vec3& origin, const glm::vec3& direction,
@@ -28,12 +30,12 @@ public:
                          BoxFace& face, glm::vec3& surfaceNormal,
                          void** intersectedObject, bool precisionPicking) const override;
 
-    void updateLightFromEntity(render::PendingChanges& pendingChanges);
+    void updateLightFromEntity(render::Transaction& transaction);
 
-    virtual bool addToScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) override;
+    virtual bool addToScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) override;
 
     virtual void somethingChangedNotification() override;
-    virtual void removeFromScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) override;
+    virtual void removeFromScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) override;
 
     virtual void locationChanged(bool tellPhysics = true) override;
 

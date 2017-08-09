@@ -25,6 +25,7 @@
 #include <DependencyManager.h>
 #include <GeometryUtil.h>
 #include <gpu/Batch.h>
+#include <render/Forward.h>
 #include <render/Scene.h>
 #include <Transform.h>
 #include <SpatiallyNestable.h>
@@ -34,15 +35,15 @@
 #include "TextureCache.h"
 #include "Rig.h"
 
+
 class AbstractViewStateInterface;
 class QScriptEngine;
 
-#include "RenderArgs.h"
 class ViewFrustum;
 
 namespace render {
     class Scene;
-    class PendingChanges;
+    class Transaction;
     typedef unsigned int ItemID;
 }
 class MeshPartPayload;
@@ -68,7 +69,7 @@ public:
 
     static void setAbstractViewStateInterface(AbstractViewStateInterface* viewState) { _viewState = viewState; }
 
-    Model(RigPointer rig, QObject* parent = nullptr, SpatiallyNestable* spatiallyNestableOverride = nullptr);
+    Model(QObject* parent = nullptr, SpatiallyNestable* spatiallyNestableOverride = nullptr);
     virtual ~Model();
 
     inline ModelPointer getThisPointer() const {
@@ -81,21 +82,21 @@ public:
     const QUrl& getURL() const { return _url; }
 
     // new Scene/Engine rendering support
-    void setVisibleInScene(bool newValue, std::shared_ptr<render::Scene> scene);
-    void setLayeredInFront(bool layered, std::shared_ptr<render::Scene> scene);
+    void setVisibleInScene(bool newValue, const render::ScenePointer& scene);
+    void setLayeredInFront(bool layered, const render::ScenePointer& scene);
     bool needsFixupInScene() const;
 
     bool needsReload() const { return _needsReload; }
-    bool initWhenReady(render::ScenePointer scene);
-    bool addToScene(std::shared_ptr<render::Scene> scene,
-                    render::PendingChanges& pendingChanges) {
+    bool initWhenReady(const render::ScenePointer& scene);
+    bool addToScene(const render::ScenePointer& scene,
+                    render::Transaction& transaction) {
         auto getters = render::Item::Status::Getters(0);
-        return addToScene(scene, pendingChanges, getters);
+        return addToScene(scene, transaction, getters);
     }
-    bool addToScene(std::shared_ptr<render::Scene> scene,
-                    render::PendingChanges& pendingChanges,
+    bool addToScene(const render::ScenePointer& scene,
+                    render::Transaction& transaction,
                     render::Item::Status::Getters& statusGetters);
-    void removeFromScene(std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges);
+    void removeFromScene(const render::ScenePointer& scene, render::Transaction& transaction);
     bool isRenderable() const;
 
     bool isVisible() const { return _isVisible; }
@@ -121,8 +122,6 @@ public:
 
     void init();
     void reset();
-
-    void setScaleToFit(bool scaleToFit, const glm::vec3& dimensions);
 
     void setSnapModelToRegistrationPoint(bool snapModelToRegistrationPoint, const glm::vec3& registrationPoint);
     bool getSnapModelToRegistrationPoint() { return _snapModelToRegistrationPoint; }
@@ -158,12 +157,13 @@ public:
 
     bool findRayIntersectionAgainstSubMeshes(const glm::vec3& origin, const glm::vec3& direction, float& distance,
                                              BoxFace& face, glm::vec3& surfaceNormal, 
-                                             QString& extraInfo, bool pickAgainstTriangles = false);
+                                             QString& extraInfo, bool pickAgainstTriangles = false, bool allowBackface = false);
 
     void setOffset(const glm::vec3& offset);
     const glm::vec3& getOffset() const { return _offset; }
 
     void setScaleToFit(bool scaleToFit, float largestDimension = 0.0f, bool forceRescale = false);
+    void setScaleToFit(bool scaleToFit, const glm::vec3& dimensions, bool forceRescale = false);
     bool getScaleToFit() const { return _scaleToFit; } /// is scale to fit enabled
 
     void setSnapModelToCenter(bool snapModelToCenter) {
@@ -174,10 +174,9 @@ public:
     }
 
     /// Returns the number of joint states in the model.
-    int getJointStateCount() const { return (int)_rig->getJointStateCount(); }
+    int getJointStateCount() const { return (int)_rig.getJointStateCount(); }
     bool getJointPositionInWorldFrame(int jointIndex, glm::vec3& position) const;
     bool getJointRotationInWorldFrame(int jointIndex, glm::quat& rotation) const;
-    bool getJointCombinedRotation(int jointIndex, glm::quat& rotation) const;
 
     /// \param jointIndex index of joint in model structure
     /// \param rotation[out] rotation of joint in model-frame
@@ -209,6 +208,8 @@ public:
     const glm::vec3& getTranslation() const { return _translation; }
     const glm::quat& getRotation() const { return _rotation; }
 
+    glm::vec3 getNaturalDimensions() const;
+
     Transform getTransform() const;
 
     void setScale(const glm::vec3& scale);
@@ -223,7 +224,8 @@ public:
         return ((index < 0) && (index >= _blendshapeCoefficients.size())) ? 0.0f : _blendshapeCoefficients.at(index);
      }
 
-    virtual RigPointer getRig() const { return _rig; }
+    Rig& getRig() { return _rig; }
+    const Rig& getRig() const { return _rig; }
 
     const glm::vec3& getRegistrationPoint() const { return _registrationPoint; }
 
@@ -248,10 +250,14 @@ public:
     const MeshState& getMeshState(int index) { return _meshStates.at(index); }
 
     uint32_t getGeometryCounter() const { return _deleteGeometryCounter; }
-    const QMap<render::ItemID, render::PayloadPointer>& getRenderItems() const { return _modelMeshRenderItems; }
+    const QMap<render::ItemID, render::PayloadPointer>& getRenderItems() const { return _modelMeshRenderItemsMap; }
 
     void renderDebugMeshBoxes(gpu::Batch& batch);
 
+    int getResourceDownloadAttempts() { return _renderWatcher.getResourceDownloadAttempts(); }
+    int getResourceDownloadAttemptsRemaining() { return _renderWatcher.getResourceDownloadAttemptsRemaining(); }
+
+    Q_INVOKABLE MeshProxyList getMeshes() const;
 
 public slots:
     void loadURLFinished(bool success);
@@ -373,11 +379,11 @@ protected:
 
     static AbstractViewStateInterface* _viewState;
 
-    QSet<std::shared_ptr<MeshPartPayload>> _collisionRenderItemsSet;
-    QMap<render::ItemID, render::PayloadPointer> _collisionRenderItems;
+    QVector<std::shared_ptr<MeshPartPayload>> _collisionRenderItems;
+    QMap<render::ItemID, render::PayloadPointer> _collisionRenderItemsMap;
 
-    QSet<std::shared_ptr<ModelMeshPartPayload>> _modelMeshRenderItemsSet;
-    QMap<render::ItemID, render::PayloadPointer> _modelMeshRenderItems;
+	QVector<std::shared_ptr<ModelMeshPartPayload>> _modelMeshRenderItems;
+	QMap<render::ItemID, render::PayloadPointer> _modelMeshRenderItemsMap;
 
     render::ItemIDs _modelMeshRenderItemIDs;
 
@@ -388,7 +394,7 @@ protected:
     mutable bool _needsUpdateTextures { true };
 
     friend class ModelMeshPartPayload;
-    RigPointer _rig;
+    Rig _rig;
 
     uint32_t _deleteGeometryCounter { 0 };
 

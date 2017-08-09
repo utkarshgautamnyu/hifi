@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.2)
+if (WIN32)
+  cmake_minimum_required(VERSION 3.7)
+else()
+  cmake_minimum_required(VERSION 3.2)
+endif()
 
 if (USE_ANDROID_TOOLCHAIN)
   include("cmake/android/ToolchainSetup.cmake")
@@ -32,7 +36,13 @@ project(hifi)
 add_definitions(-DGLM_FORCE_RADIANS)
 set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
+find_package( Threads )
+
 if (WIN32)
+  if (NOT "${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+    message( FATAL_ERROR "Only 64 bit builds supported." )
+  endif()
+
   add_definitions(-DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
 
   if (NOT WINDOW_SDK_PATH)
@@ -41,16 +51,13 @@ if (WIN32)
 
   # sets path for Microsoft SDKs
   # if you get build error about missing 'glu32' this path is likely wrong
-  if (MSVC10)
-    set(WINDOW_SDK_PATH "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1 " CACHE PATH "Windows SDK PATH")
-  elseif (MSVC12)
-    if ("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
-      set(WINDOW_SDK_FOLDER "x64")
-    else()
-      set(WINDOW_SDK_FOLDER "x86")
-    endif()
+  if (MSVC_VERSION GREATER_EQUAL 1910) # VS 2017
+    set(WINDOW_SDK_PATH "C:/Program Files (x86)/Windows Kits/10/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64" CACHE PATH "Windows SDK PATH")
+  elseif (MSVC_VERSION GREATER_EQUAL 1800) # VS 2013
     set(WINDOW_SDK_PATH "C:\\Program Files (x86)\\Windows Kits\\8.1\\Lib\\winv6.3\\um\\${WINDOW_SDK_FOLDER}" CACHE PATH "Windows SDK PATH")
-  endif ()
+  else()
+    message( FATAL_ERROR "Visual Studio 2013 or higher required." )
+  endif()
 
   if (DEBUG_DISCOVERED_SDK_PATH)
     message(STATUS "The discovered Windows SDK path is ${WINDOW_SDK_PATH}")
@@ -103,7 +110,7 @@ else ()
 endif ()
 
 if (APPLE)
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x")
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11")
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --stdlib=libc++")
 endif ()
@@ -209,8 +216,10 @@ foreach(CUSTOM_MACRO ${HIFI_CUSTOM_MACROS})
   include(${CUSTOM_MACRO})
 endforeach()
 
-file(GLOB_RECURSE JS_SRC scripts/*.js)
+file(GLOB_RECURSE JS_SRC scripts/*.js unpublishedScripts/*.js)
 add_custom_target(js SOURCES ${JS_SRC})
+GroupSources("scripts")
+GroupSources("unpublishedScripts")
 
 if (UNIX)
    install(
