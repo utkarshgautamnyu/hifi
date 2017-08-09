@@ -30,12 +30,6 @@ class QDebug;
 namespace gpu {
 
 enum ReservedSlot {
-
-#ifdef GPU_SSBO_DRAW_CALL_INFO
-    TRANSFORM_OBJECT_SLOT = 14,
-#else
-    TRANSFORM_OBJECT_SLOT = 31,
-#endif
     TRANSFORM_CAMERA_SLOT = 15,
 };
 
@@ -191,8 +185,11 @@ public:
     void setUniformBuffer(uint32 slot, const BufferPointer& buffer, Offset offset, Offset size);
     void setUniformBuffer(uint32 slot, const BufferView& view); // not a command, just a shortcut from a BufferView
 
-    void setResourceTexture(uint32 slot, const TexturePointer& view);
+    void setResourceBuffer(uint32 slot, const BufferPointer& buffer);
+
+    void setResourceTexture(uint32 slot, const TexturePointer& texture);
     void setResourceTexture(uint32 slot, const TextureView& view); // not a command, just a shortcut from a TextureView
+
 
     // Ouput Stage
     void setFramebuffer(const FramebufferPointer& framebuffer);
@@ -221,6 +218,12 @@ public:
 
     // Reset the stage caches and states
     void resetStages();
+
+    void disableContextViewCorrection();
+    void restoreContextViewCorrection();
+
+    void disableContextStereo();
+    void restoreContextStereo();
 
     // Debugging
     void pushProfileRange(const char* name);
@@ -292,6 +295,7 @@ public:
         COMMAND_setStateScissorRect,
 
         COMMAND_setUniformBuffer,
+        COMMAND_setResourceBuffer,
         COMMAND_setResourceTexture,
 
         COMMAND_setFramebuffer,
@@ -304,6 +308,12 @@ public:
         COMMAND_getQuery,
 
         COMMAND_resetStages,
+
+        COMMAND_disableContextViewCorrection,
+        COMMAND_restoreContextViewCorrection,
+
+        COMMAND_disableContextStereo,
+        COMMAND_restoreContextStereo,
 
         COMMAND_runLambda,
 
@@ -472,7 +482,7 @@ public:
     NamedBatchDataMap _namedData;
 
     bool _enableStereo{ true };
-    bool _enableSkybox{ false };
+    bool _enableSkybox { false };
 
 protected:
     friend class Context;

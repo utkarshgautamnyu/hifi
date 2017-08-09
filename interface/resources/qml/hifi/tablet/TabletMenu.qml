@@ -2,8 +2,13 @@ import QtQuick 2.5
 import QtGraphicalEffects 1.0
 import QtQuick.Controls 1.4
 import QtQml 2.2
+import QtWebChannel 1.0
+import QtWebEngine  1.1
+
+
 import "."
 import "../../styles-uit"
+import "../../controls"
 
 FocusScope {
     id: tabletMenu
@@ -13,10 +18,10 @@ FocusScope {
     height: 720
 
     property var rootMenu: Menu { objectName:"rootMenu" }
-    property var point: Qt.point(50, 50)
+    property var point: Qt.point(50, 50);
+    TabletMenuStack { id: menuPopperUpper }
     property string subMenu: ""
-
-    TabletMouseHandler { id: menuPopperUpper }
+    signal sendToScript(var message);
 
     Rectangle {
         id: bgNavBar
@@ -53,10 +58,11 @@ FocusScope {
                 anchors.fill: parent
                 hoverEnabled: true
                 onEntered: iconColorOverlay.color = "#1fc6a6";
-                onExited: iconColorOverlay.color = "#ffffff";
+                onExited: iconColorOverlay.color = "#34a2c7";
                 // navigate back to root level menu
                 onClicked: {
                     buildMenu();
+                    breadcrumbText.text = "Menu";
                     tabletRoot.playButtonClickSound();
                 }
             }
@@ -97,6 +103,7 @@ FocusScope {
         menuPopperUpper.closeLastMenu();
     }
 
+
     function setRootMenu(rootMenu, subMenu) {
         tabletMenu.subMenu = subMenu;
         tabletMenu.rootMenu = rootMenu;
@@ -116,12 +123,12 @@ FocusScope {
             }
             subMenu = "";  // Continue with full menu after initially displaying submenu.
             if (found) {
-                menuPopperUpper.popup(tabletMenu, rootMenu.items[index].items);
+                menuPopperUpper.popup(rootMenu.items[index].items);
                 return;
             }
         }
 
         // Otherwise build whole menu.
-        menuPopperUpper.popup(tabletMenu, rootMenu.items);
+        menuPopperUpper.popup(rootMenu.items);
     }
 }

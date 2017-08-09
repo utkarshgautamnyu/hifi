@@ -14,13 +14,16 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
-/* global MyAvatar, Entities, Script, Camera, Vec3, Reticle, Overlays, getEntityCustomData, Messages, Quat, Controller */
+/* global MyAvatar, Entities, Script, Camera, Vec3, Reticle, Overlays, getEntityCustomData, Messages, Quat, Controller,
+   isInEditMode, HMD */
 
 
 (function() { // BEGIN LOCAL_SCOPE
 
 Script.include("/~/system/libraries/utils.js");
 var MAX_SOLID_ANGLE = 0.01; // objects that appear smaller than this can't be grabbed
+
+var DELAY_FOR_30HZ = 33; // milliseconds
 
 var ZERO_VEC3 = {
     x: 0,
@@ -46,7 +49,7 @@ var ACTION_TTL = 10; // seconds
 function getTag() {
     return "grab-" + MyAvatar.sessionUUID;
 }
-  
+
 var DISTANCE_HOLDING_ACTION_TIMEFRAME = 0.1; // how quickly objects move to their new position
 var DISTANCE_HOLDING_UNITY_MASS = 1200; //  The mass at which the distance holding action timeframe is unmodified
 var DISTANCE_HOLDING_UNITY_DISTANCE = 6; //  The distance at which the distance holding action timeframe is unmodified
@@ -343,7 +346,8 @@ Grabber.prototype.pressEvent = function(event) {
         return;
     }
 
-    if (!pickResults.properties.dynamic) {
+    var isDynamic = Entities.getEntityProperties(pickResults.entityID, "dynamic").dynamic;
+    if (!isDynamic) {
         // only grab dynamic objects
         return;
     }
@@ -410,8 +414,13 @@ Grabber.prototype.pressEvent = function(event) {
 };
 
 Grabber.prototype.releaseEvent = function(event) {
-    if (event.isLeftButton!==true ||event.isRightButton===true || event.isMiddleButton===true) {
+    if (event.isLeftButton!==true || event.isRightButton===true || event.isMiddleButton===true) {
         return;
+    }
+
+    if (this.moveEventTimer) {
+        Script.clearTimeout(this.moveEventTimer);
+        this.moveEventTimer = null;
     }
 
     if (this.isGrabbing) {
@@ -438,14 +447,34 @@ Grabber.prototype.releaseEvent = function(event) {
     }
 };
 
+Grabber.prototype.scheduleMouseMoveProcessor = function(event) {
+    var _this = this;
+    if (!this.moveEventTimer) {
+        this.moveEventTimer = Script.setTimeout(function() {
+            _this.moveEventProcess();
+        }, DELAY_FOR_30HZ);
+    }
+};
+
 Grabber.prototype.moveEvent = function(event) {
+    // during the handling of the event, do as little as possible.  We save the updated mouse position,
+    // and start a timer to react to the change.  If more changes arrive before the timer fires, only
+    // the last update will be considered.  This is done to avoid backing-up Qt's event queue.
     if (!this.isGrabbing) {
         return;
     }
     mouse.updateDrag(event);
+    this.scheduleMouseMoveProcessor();
+};
 
+Grabber.prototype.moveEventProcess = function() {
+    this.moveEventTimer = null;
     // see if something added/restored gravity
     var entityProperties = Entities.getEntityProperties(this.entityID);
+    if (!entityProperties || !entityProperties.gravity) {
+        return;
+    }
+
     if (Vec3.length(entityProperties.gravity) !== 0.0) {
         this.originalGravity = entityProperties.gravity;
     }
@@ -463,7 +492,7 @@ Grabber.prototype.moveEvent = function(event) {
         var orientation = Camera.getOrientation();
         var dragOffset = Vec3.multiply(drag.x, Quat.getRight(orientation));
         dragOffset = Vec3.sum(dragOffset, Vec3.multiply(-drag.y, Quat.getUp(orientation)));
-        var axis = Vec3.cross(dragOffset, Quat.getFront(orientation));
+        var axis = Vec3.cross(dragOffset, Quat.getForward(orientation));
         axis = Vec3.normalize(axis);
         var ROTATE_STRENGTH = 0.4; // magic number tuned by hand
         var angle = ROTATE_STRENGTH * Math.sqrt((drag.x * drag.x) + (drag.y * drag.y));
@@ -484,10 +513,10 @@ Grabber.prototype.moveEvent = function(event) {
 
     } else {
         var newPointOnPlane;
-        
+
         if (this.mode === "verticalCylinder") {
             // for this mode we recompute the plane based on current Camera
-            var planeNormal = Quat.getFront(Camera.getOrientation());
+            var planeNormal = Quat.getForward(Camera.getOrientation());
             planeNormal.y = 0;
             planeNormal = Vec3.normalize(planeNormal);
             var pointOnCylinder = Vec3.multiply(planeNormal, this.xzDistanceToGrab);
@@ -500,7 +529,7 @@ Grabber.prototype.moveEvent = function(event) {
             };
 
         } else {
-            
+
             newPointOnPlane = mouseIntersectionWithPlane(
                     this.pointOnPlane, this.planeNormal, mouse.current, this.maxDistance);
             var relativePosition = Vec3.subtract(newPointOnPlane, cameraPosition);
@@ -528,11 +557,13 @@ Grabber.prototype.moveEvent = function(event) {
 
     if (!this.actionID) {
         if (!entityIsGrabbedByOther(this.entityID)) {
-            this.actionID = Entities.addAction("spring", this.entityID, actionArgs);
+            this.actionID = Entities.addAction("far-grab", this.entityID, actionArgs);
         }
     } else {
         Entities.updateAction(this.entityID, this.actionID, actionArgs);
     }
+
+    this.scheduleMouseMoveProcessor();
 };
 
 Grabber.prototype.keyReleaseEvent = function(event) {
