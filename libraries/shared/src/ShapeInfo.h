@@ -1,6 +1,6 @@
 //
 //  ShapeInfo.h
-//  libraries/physcis/src
+//  libraries/physics/src
 //
 //  Created by Andrew Meadows 2014.10.29
 //  Copyright 2014 High Fidelity, Inc.
@@ -89,6 +89,8 @@ public:
     const DoubleHashKey& getHash() const;
 
 protected:
+    void setHalfExtents(const glm::vec3& halfExtents);
+
     QUrl _url; // url for model of convex collision hulls
     PointCollection _pointCollection;
     TriangleIndices _triangleIndices;

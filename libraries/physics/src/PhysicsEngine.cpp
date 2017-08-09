@@ -1,6 +1,6 @@
 //
 //  PhysicsEngine.cpp
-//  libraries/physcis/src
+//  libraries/physics/src
 //
 //  Created by Andrew Meadows 2014.10.29
 //  Copyright 2014 High Fidelity, Inc.
@@ -129,6 +129,9 @@ void PhysicsEngine::addObjectToDynamicsWorld(ObjectMotionState* motionState) {
             }
             body->setCollisionFlags(btCollisionObject::CF_STATIC_OBJECT);
             body->updateInertiaTensor();
+            if (motionState->isLocallyOwned()) {
+                _activeStaticBodies.insert(body);
+            }
             break;
         }
     }
@@ -140,6 +143,26 @@ void PhysicsEngine::addObjectToDynamicsWorld(ObjectMotionState* motionState) {
     _dynamicsWorld->addRigidBody(body, group, mask);
 
     motionState->clearIncomingDirtyFlags();
+}
+
+QList<EntityDynamicPointer> PhysicsEngine::removeDynamicsForBody(btRigidBody* body) {
+    // remove dynamics that are attached to this body
+    QList<EntityDynamicPointer> removedDynamics;
+    QMutableSetIterator<QUuid> i(_objectDynamicsByBody[body]);
+
+    while (i.hasNext()) {
+        QUuid dynamicID = i.next();
+        if (dynamicID.isNull()) {
+            continue;
+        }
+        EntityDynamicPointer dynamic = _objectDynamics[dynamicID];
+        if (!dynamic) {
+            continue;
+        }
+        removeDynamic(dynamicID);
+        removedDynamics += dynamic;
+    }
+    return removedDynamics;
 }
 
 void PhysicsEngine::removeObjects(const VectorOfMotionStates& objects) {
@@ -154,19 +177,9 @@ void PhysicsEngine::removeObjects(const VectorOfMotionStates& objects) {
         // frame (because the framerate is faster than our physics simulation rate).  When this happens we must scan
         // _activeStaticBodies for objects that were recently deleted so we don't try to access a dangling pointer.
         for (auto object : objects) {
-            btRigidBody* body = object->getRigidBody();
-
-            std::vector<btRigidBody*>::reverse_iterator itr = _activeStaticBodies.rbegin();
-            while (itr != _activeStaticBodies.rend()) {
-                if (body == *itr) {
-                    if (*itr != *(_activeStaticBodies.rbegin())) {
-                        // swap with rbegin
-                        *itr = *(_activeStaticBodies.rbegin());
-                    }
-                    _activeStaticBodies.pop_back();
-                    break;
-                }
-                ++itr;
+            std::set<btRigidBody*>::iterator itr = _activeStaticBodies.find(object->getRigidBody());
+            if (itr != _activeStaticBodies.end()) {
+                _activeStaticBodies.erase(itr);
             }
         }
     }
@@ -175,6 +188,7 @@ void PhysicsEngine::removeObjects(const VectorOfMotionStates& objects) {
     for (auto object : objects) {
         btRigidBody* body = object->getRigidBody();
         if (body) {
+            removeDynamicsForBody(body);
             _dynamicsWorld->removeRigidBody(body);
 
             // NOTE: setRigidBody() modifies body->m_userPointer so we should clear the MotionState's body BEFORE deleting it.
@@ -186,11 +200,12 @@ void PhysicsEngine::removeObjects(const VectorOfMotionStates& objects) {
 }
 
 // Same as above, but takes a Set instead of a Vector.  Should only be called during teardown.
-void PhysicsEngine::removeObjects(const SetOfMotionStates& objects) {
+void PhysicsEngine::removeSetOfObjects(const SetOfMotionStates& objects) {
     _contactMap.clear();
     for (auto object : objects) {
         btRigidBody* body = object->getRigidBody();
         if (body) {
+            removeDynamicsForBody(body);
             _dynamicsWorld->removeRigidBody(body);
 
             // NOTE: setRigidBody() modifies body->m_userPointer so we should clear the MotionState's body BEFORE deleting it.
@@ -198,6 +213,7 @@ void PhysicsEngine::removeObjects(const SetOfMotionStates& objects) {
             body->setMotionState(nullptr);
             delete body;
         }
+        object->clearIncomingDirtyFlags();
     }
 }
 
@@ -222,14 +238,16 @@ VectorOfMotionStates PhysicsEngine::changeObjects(const VectorOfMotionStates& ob
             object->clearIncomingDirtyFlags();
         }
         if (object->getMotionType() == MOTION_TYPE_STATIC && object->isActive()) {
-            _activeStaticBodies.push_back(object->getRigidBody());
+            _activeStaticBodies.insert(object->getRigidBody());
         }
     }
     // active static bodies have changed (in an Easy way) and need their Aabbs updated
     // but we've configured Bullet to NOT update them automatically (for improved performance)
     // so we must do it ourselves
-    for (size_t i = 0; i < _activeStaticBodies.size(); ++i) {
-        _dynamicsWorld->updateSingleAabb(_activeStaticBodies[i]);
+    std::set<btRigidBody*>::const_iterator itr = _activeStaticBodies.begin();
+    while (itr != _activeStaticBodies.end()) {
+        _dynamicsWorld->updateSingleAabb(*itr);
+        ++itr;
     }
     return stillNeedChange;
 }
@@ -240,7 +258,6 @@ void PhysicsEngine::reinsertObject(ObjectMotionState* object) {
     btRigidBody* body = object->getRigidBody();
     if (body) {
         _dynamicsWorld->removeRigidBody(body);
-
         // add it back
         addObjectToDynamicsWorld(object);
     }
@@ -474,13 +491,23 @@ const CollisionEvents& PhysicsEngine::getCollisionEvents() {
 
 const VectorOfMotionStates& PhysicsEngine::getChangedMotionStates() {
     BT_PROFILE("copyOutgoingChanges");
+
+    _dynamicsWorld->synchronizeMotionStates();
+
     // Bullet will not deactivate static objects (it doesn't expect them to be active)
     // so we must deactivate them ourselves
-    for (size_t i = 0; i < _activeStaticBodies.size(); ++i) {
-        _activeStaticBodies[i]->forceActivationState(ISLAND_SLEEPING);
+    std::set<btRigidBody*>::const_iterator itr = _activeStaticBodies.begin();
+    while (itr != _activeStaticBodies.end()) {
+        btRigidBody* body = *itr;
+        body->forceActivationState(ISLAND_SLEEPING);
+        ObjectMotionState* motionState = static_cast<ObjectMotionState*>(body->getUserPointer());
+        if (motionState) {
+            _dynamicsWorld->addChangedMotionState(motionState);
+        }
+        ++itr;
     }
     _activeStaticBodies.clear();
-    _dynamicsWorld->synchronizeMotionStates();
+
     _hasOutgoingChanges = false;
     return _dynamicsWorld->getChangedMotionStates();
 }
@@ -548,44 +575,84 @@ void PhysicsEngine::setCharacterController(CharacterController* character) {
     }
 }
 
-EntityActionPointer PhysicsEngine::getActionByID(const QUuid& actionID) const {
-    if (_objectActions.contains(actionID)) {
-        return _objectActions[actionID];
+EntityDynamicPointer PhysicsEngine::getDynamicByID(const QUuid& dynamicID) const {
+    if (_objectDynamics.contains(dynamicID)) {
+        return _objectDynamics[dynamicID];
     }
     return nullptr;
 }
 
-void PhysicsEngine::addAction(EntityActionPointer action) {
-    assert(action);
-    const QUuid& actionID = action->getID();
-    if (_objectActions.contains(actionID)) {
-        if (_objectActions[actionID] == action) {
+bool PhysicsEngine::addDynamic(EntityDynamicPointer dynamic) {
+    assert(dynamic);
+
+    if (!dynamic->isReadyForAdd()) {
+        return false;
+    }
+
+    const QUuid& dynamicID = dynamic->getID();
+    if (_objectDynamics.contains(dynamicID)) {
+        if (_objectDynamics[dynamicID] == dynamic) {
+            return true;
+        }
+        removeDynamic(dynamic->getID());
+    }
+
+    bool success { false };
+    if (dynamic->isAction()) {
+        ObjectAction* objectAction = static_cast<ObjectAction*>(dynamic.get());
+        _dynamicsWorld->addAction(objectAction);
+        success = true;
+    } else if (dynamic->isConstraint()) {
+        ObjectConstraint* objectConstraint = static_cast<ObjectConstraint*>(dynamic.get());
+        btTypedConstraint* constraint = objectConstraint->getConstraint();
+        if (constraint) {
+            _dynamicsWorld->addConstraint(constraint);
+            success = true;
+        } // else perhaps not all the rigid bodies are available, yet
+    }
+
+    if (success) {
+        _objectDynamics[dynamicID] = dynamic;
+        foreach(btRigidBody* rigidBody, std::static_pointer_cast<ObjectDynamic>(dynamic)->getRigidBodies()) {
+            _objectDynamicsByBody[rigidBody] += dynamic->getID();
+        }
+    }
+    return success;
+}
+
+void PhysicsEngine::removeDynamic(const QUuid dynamicID) {
+    if (_objectDynamics.contains(dynamicID)) {
+        ObjectDynamicPointer dynamic = std::static_pointer_cast<ObjectDynamic>(_objectDynamics[dynamicID]);
+        if (!dynamic) {
             return;
         }
-        removeAction(action->getID());
+        QList<btRigidBody*> rigidBodies = dynamic->getRigidBodies();
+        if (dynamic->isAction()) {
+            ObjectAction* objectAction = static_cast<ObjectAction*>(dynamic.get());
+            _dynamicsWorld->removeAction(objectAction);
+        } else {
+            ObjectConstraint* objectConstraint = static_cast<ObjectConstraint*>(dynamic.get());
+            btTypedConstraint* constraint = objectConstraint->getConstraint();
+            if (constraint) {
+                _dynamicsWorld->removeConstraint(constraint);
+            } else {
+                qCDebug(physics) << "PhysicsEngine::removeDynamic of constraint failed";
+            }
+        }
+        _objectDynamics.remove(dynamicID);
+        foreach(btRigidBody* rigidBody, rigidBodies) {
+            _objectDynamicsByBody[rigidBody].remove(dynamic->getID());
+        }
+        dynamic->invalidate();
     }
-
-    _objectActions[actionID] = action;
-
-    // bullet needs a pointer to the action, but it doesn't use shared pointers.
-    // is there a way to bump the reference count?
-    ObjectAction* objectAction = static_cast<ObjectAction*>(action.get());
-    _dynamicsWorld->addAction(objectAction);
 }
 
-void PhysicsEngine::removeAction(const QUuid actionID) {
-    if (_objectActions.contains(actionID)) {
-        EntityActionPointer action = _objectActions[actionID];
-        ObjectAction* objectAction = static_cast<ObjectAction*>(action.get());
-        _dynamicsWorld->removeAction(objectAction);
-        _objectActions.remove(actionID);
-    }
-}
-
-void PhysicsEngine::forEachAction(std::function<void(EntityActionPointer)> actor) {
-    QHashIterator<QUuid, EntityActionPointer> iter(_objectActions);
+void PhysicsEngine::forEachDynamic(std::function<void(EntityDynamicPointer)> actor) {
+    QMutableHashIterator<QUuid, EntityDynamicPointer> iter(_objectDynamics);
     while (iter.hasNext()) {
         iter.next();
-        actor(iter.value());
+        if (iter.value()) {
+            actor(iter.value());
+        }
     }
 }

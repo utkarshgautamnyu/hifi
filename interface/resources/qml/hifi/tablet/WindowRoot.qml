@@ -18,7 +18,6 @@ Windows.ScrollingWindow {
     id: tabletRoot
     objectName: "tabletRoot"
     property string username: "Unknown user"
-    property var eventBridge;
 
     property var rootMenu;
     property string subMenu: ""
@@ -38,6 +37,11 @@ Windows.ScrollingWindow {
         loader.source = url;
     }
 
+    function loadWebBase() {
+        loader.source = "";
+        loader.source = "WindowWebView.qml";
+    }
+
     function loadWebUrl(url, injectedJavaScriptUrl) {
         loader.item.url = url;
         loader.item.scriptURL = injectedJavaScriptUrl;
@@ -48,8 +52,10 @@ Windows.ScrollingWindow {
 
     // used to receive messages from interface script
     function fromScript(message) {
-        if (loader.item.hasOwnProperty("fromScript")) {
-            loader.item.fromScript(message);
+        if (loader.item !== null) {
+            if (loader.item.hasOwnProperty("fromScript")) {
+                loader.item.fromScript(message);
+            }
         }
     }
 
@@ -67,10 +73,6 @@ Windows.ScrollingWindow {
         }
     }
 
-    function toggleMicEnabled() {
-        ApplicationInterface.toggleMuteAudio();
-    }
-
     function setUsername(newUsername) {
         username = newUsername;
     }
@@ -86,18 +88,19 @@ Windows.ScrollingWindow {
         //anchors.top: parent.top
         //anchors.topMargin: 0
 
-        onLoaded: {
-            parent.y = 0
-            if (loader.item.hasOwnProperty("eventBridge")) {
-                loader.item.eventBridge = eventBridge;
-
-                // Hook up callback for clara.io download from the marketplace.
-                eventBridge.webEventReceived.connect(function (event) {
-                    if (event.slice(0, 17) === "CLARA.IO DOWNLOAD") {
-                        ApplicationInterface.addAssetToWorldFromURL(event.slice(18));
-                    }
-                });
+        // Hook up callback for clara.io download from the marketplace.
+        Connections {
+            id: eventBridgeConnection
+            target: eventBridge
+            onWebEventReceived: {
+                if (message.slice(0, 17) === "CLARA.IO DOWNLOAD") {
+                    ApplicationInterface.addAssetToWorldFromURL(message.slice(18));
+                }
             }
+        }
+
+        onLoaded: {
+			parent.y = 0
             if (loader.item.hasOwnProperty("sendToScript")) {
                 loader.item.sendToScript.connect(tabletRoot.sendToScript);
             }

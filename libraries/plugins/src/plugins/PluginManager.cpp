@@ -24,6 +24,22 @@
 #include "PluginLogging.h"
 
 
+void PluginManager::setDisplayPluginProvider(const DisplayPluginProvider& provider) {
+    _displayPluginProvider = provider;
+}
+
+void PluginManager::setInputPluginProvider(const InputPluginProvider& provider) {
+    _inputPluginProvider = provider;
+}
+
+void PluginManager::setCodecPluginProvider(const CodecPluginProvider& provider) {
+    _codecPluginProvider = provider;
+}
+
+void PluginManager::setInputPluginSettingsPersister(const InputPluginSettingsPersister& persister) {
+    _inputSettingsPersister = persister;
+}
+
 PluginManager* PluginManager::getInstance() {
     static PluginManager _manager;
     return &_manager;
@@ -117,12 +133,12 @@ const LoaderList& getLoadedPlugins() {
 PluginManager::PluginManager() {
 }
 
-extern CodecPluginList getCodecPlugins();
-
 const CodecPluginList& PluginManager::getCodecPlugins() {
     static CodecPluginList codecPlugins;
     static std::once_flag once;
     std::call_once(once, [&] {
+        codecPlugins = _codecPluginProvider();
+
         // Now grab the dynamic plugins
         for (auto loader : getLoadedPlugins()) {
             CodecProvider* codecProvider = qobject_cast<CodecProvider*>(loader->instance());
@@ -224,11 +240,11 @@ const SteamClientPluginPointer PluginManager::getSteamClientPlugin() {
     return steamClientPlugin;
 }
 
+
 static DisplayPluginList displayPlugins;
 
 const DisplayPluginList& PluginManager::getDisplayPlugins() {
     qInfo() << __FUNCTION__ << "line:" << __LINE__;
-
 
     static std::once_flag once;
     static auto deviceAddedCallback = [](QString deviceName) {
@@ -242,7 +258,7 @@ const DisplayPluginList& PluginManager::getDisplayPlugins() {
 
     std::call_once(once, [&] {
         // Grab the built in plugins
-        displayPlugins = ::getDisplayPlugins();
+        displayPlugins = _displayPluginProvider();
 
 
         // Now grab the dynamic plugins
@@ -288,7 +304,7 @@ const InputPluginList& PluginManager::getInputPlugins() {
     };
 
     std::call_once(once, [&] {
-        inputPlugins = ::getInputPlugins();
+        inputPlugins = _inputPluginProvider();
 
         // Now grab the dynamic plugins
         for (auto loader : getLoadedPlugins()) {
@@ -347,7 +363,7 @@ void PluginManager::disableInputs(const QStringList& inputs) {
 }
 
 void PluginManager::saveSettings() {
-    saveInputPluginSettings(getInputPlugins());
+    _inputSettingsPersister(getInputPlugins());
 }
 
 void PluginManager::shutdown() {

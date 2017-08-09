@@ -137,7 +137,7 @@ int ShapeEntityItem::readEntitySubclassDataFromBuffer(const unsigned char* data,
 }
 
 
-// TODO: eventually only include properties changed since the params.lastQuerySent time
+// TODO: eventually only include properties changed since the params.nodeData->getLastTimeBagEmpty() time
 EntityPropertyFlags ShapeEntityItem::getEntityProperties(EncodeBitstreamParams& params) const {
     EntityPropertyFlags requestedProperties = EntityItem::getEntityProperties(params);
     requestedProperties += PROP_SHAPE;
@@ -158,12 +158,6 @@ void ShapeEntityItem::appendSubclassData(OctreePacketData* packetData, EncodeBit
     APPEND_ENTITY_PROPERTY(PROP_SHAPE, entity::stringFromShape(getShape()));
     APPEND_ENTITY_PROPERTY(PROP_COLOR, getColor());
     APPEND_ENTITY_PROPERTY(PROP_ALPHA, getAlpha());
-}
-
-// This value specifes how the shape should be treated by physics calculations.  
-// For now, all polys will act as spheres
-ShapeType ShapeEntityItem::getShapeType() const {
-    return (_shape == entity::Shape::Cube) ? SHAPE_TYPE_BOX : SHAPE_TYPE_ELLIPSOID;
 }
 
 void ShapeEntityItem::setColor(const rgbColor& value) {
@@ -223,10 +217,12 @@ bool ShapeEntityItem::findDetailedRayIntersection(const glm::vec3& origin, const
 void ShapeEntityItem::debugDump() const {
     quint64 now = usecTimestampNow();
     qCDebug(entities) << "SHAPE EntityItem id:" << getEntityItemID() << "---------------------------------------------";
-    qCDebug(entities) << "              shape:" << stringFromShape(_shape);
+    qCDebug(entities) << "               name:" << _name;
+    qCDebug(entities) << "              shape:" << stringFromShape(_shape) << " (EnumId: " << _shape << " )";
     qCDebug(entities) << "              color:" << _color[0] << "," << _color[1] << "," << _color[2];
     qCDebug(entities) << "           position:" << debugTreeVector(getPosition());
     qCDebug(entities) << "         dimensions:" << debugTreeVector(getDimensions());
     qCDebug(entities) << "      getLastEdited:" << debugTime(getLastEdited(), now);
+	qCDebug(entities) << "SHAPE EntityItem Ptr:" << this;
 }
 

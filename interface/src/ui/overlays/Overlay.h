@@ -48,8 +48,8 @@ public:
     virtual AABox getBounds() const = 0;
     virtual bool supportsGetProperty() const { return true; }
 
-    virtual bool addToScene(Overlay::Pointer overlay, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges);
-    virtual void removeFromScene(Overlay::Pointer overlay, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges);
+    virtual bool addToScene(Overlay::Pointer overlay, const render::ScenePointer& scene, render::Transaction& transaction);
+    virtual void removeFromScene(Overlay::Pointer overlay, const render::ScenePointer& scene, render::Transaction& transaction);
 
     virtual const render::ShapeKey getShapeKey() { return render::ShapeKey::Builder::ownPipeline(); }
 
@@ -84,9 +84,9 @@ public:
     void setColorPulse(float value) { _colorPulse = value; }
     void setAlphaPulse(float value) { _alphaPulse = value; }
 
-    virtual void setProperties(const QVariantMap& properties);
-    virtual Overlay* createClone() const = 0;
-    virtual QVariant getProperty(const QString& property);
+    Q_INVOKABLE virtual void setProperties(const QVariantMap& properties);
+    Q_INVOKABLE virtual Overlay* createClone() const = 0;
+    Q_INVOKABLE virtual QVariant getProperty(const QString& property);
 
     render::ItemID getRenderItemID() const { return _renderItemID; }
     void setRenderItemID(render::ItemID renderItemID) { _renderItemID = renderItemID; }

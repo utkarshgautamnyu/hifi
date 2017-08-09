@@ -22,7 +22,8 @@
 #include <vector>
 
 #include <AABox.h>
-#include <RenderArgs.h>
+
+#include "Args.h"
 
 #include "model/Material.h"
 #include "ShapePipeline.h"
@@ -227,6 +228,7 @@ class ItemBound {
 
         ItemID id;
         AABox bound;
+        uint32_t padding;
 };
 
 // many Item Bounds in a vector

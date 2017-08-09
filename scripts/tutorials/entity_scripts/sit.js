@@ -1,5 +1,21 @@
+//
+//  sit.js
+//
+//  Created by Clement Brisset on 3/3/17
+//  Copyright 2017 High Fidelity, Inc.
+//
+//  Distributed under the Apache License, Version 2.0.
+//  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
+//
+
 (function() {
     Script.include("/~/system/libraries/utils.js");
+    if (!String.prototype.startsWith) {
+        String.prototype.startsWith = function(searchString, position){
+            position = position || 0;
+            return this.substr(position, searchString.length) === searchString;
+        };
+    }
 
     var SETTING_KEY = "com.highfidelity.avatar.isSitting";
     var ANIMATION_URL = "https://s3-us-west-1.amazonaws.com/hifi-content/clement/production/animations/sitting_idle.fbx";
@@ -28,6 +44,10 @@
     this.interval = null;
     this.sitDownSettlePeriod = null;
     this.lastTimeNoDriveKeys = null;
+    this.sittingDown = false;
+
+    // Preload the animation file
+    this.animation = AnimationCache.prefetch(ANIMATION_URL);
 
     this.preload = function(entityID) {
         this.entityID = entityID;
@@ -100,12 +120,29 @@
         return seatUser !== null;
     }
 
+    this.rolesToOverride = function() {
+        return MyAvatar.getAnimationRoles().filter(function(role) {
+            return !(role.startsWith("right") || role.startsWith("left"));
+        });
+    }
+
+    // Handler for user changing the avatar model while sitting. There's currently an issue with changing avatar models while override role animations are applied,
+    // so to avoid that problem, re-apply the role overrides once the model has finished changing.
+    this.modelURLChangeFinished = function () {
+        print("Sitter's model has FINISHED changing. Reapply anim role overrides.");
+        var roles = this.rolesToOverride();
+        for (i in roles) {
+            MyAvatar.overrideRoleAnimation(roles[i], ANIMATION_URL, ANIMATION_FPS, true, ANIMATION_FIRST_FRAME, ANIMATION_LAST_FRAME);
+        }
+    }
+
     this.sitDown = function() {
         if (this.checkSeatForAvatar()) {
             print("Someone is already sitting in that chair.");
             return;
         }
         print("Sitting down (" + this.entityID + ")");
+        this.sittingDown = true;
 
         var now = Date.now();
         this.sitDownSettlePeriod = now + IK_SETTLE_TIME;
@@ -117,10 +154,15 @@
         if (previousValue === "") {
             MyAvatar.characterControllerEnabled = false;
             MyAvatar.hmdLeanRecenterEnabled = false;
-            var ROLES = MyAvatar.getAnimationRoles();
-            for (i in ROLES) {
-                MyAvatar.overrideRoleAnimation(ROLES[i], ANIMATION_URL, ANIMATION_FPS, true, ANIMATION_FIRST_FRAME, ANIMATION_LAST_FRAME);
+            var roles = this.rolesToOverride();
+            for (i in roles) {
+                MyAvatar.overrideRoleAnimation(roles[i], ANIMATION_URL, ANIMATION_FPS, true, ANIMATION_FIRST_FRAME, ANIMATION_LAST_FRAME);
             }
+
+            for (var i in OVERRIDEN_DRIVE_KEYS) {
+                MyAvatar.disableDriveKey(OVERRIDEN_DRIVE_KEYS[i]);
+            }
+
             MyAvatar.resetSensorsAndBody();
         }
 
@@ -132,25 +174,29 @@
             return { headType: 0 };
         }, ["headType"]);
         Script.update.connect(this, this.update);
-        for (var i in OVERRIDEN_DRIVE_KEYS) {
-            MyAvatar.disableDriveKey(OVERRIDEN_DRIVE_KEYS[i]);
-        }
+        MyAvatar.onLoadComplete.connect(this, this.modelURLChangeFinished);
     }
 
     this.standUp = function() {
         print("Standing up (" + this.entityID + ")");
         MyAvatar.removeAnimationStateHandler(this.animStateHandlerID);
         Script.update.disconnect(this, this.update);
-        for (var i in OVERRIDEN_DRIVE_KEYS) {
-            MyAvatar.enableDriveKey(OVERRIDEN_DRIVE_KEYS[i]);
+        MyAvatar.onLoadComplete.disconnect(this, this.modelURLChangeFinished);
+
+        if (MyAvatar.sessionUUID === this.getSeatUser()) {
+            this.setSeatUser(null);
         }
 
-        this.setSeatUser(null);
         if (Settings.getValue(SETTING_KEY) === this.entityID) {
             Settings.setValue(SETTING_KEY, "");
-            var ROLES = MyAvatar.getAnimationRoles();
-            for (i in ROLES) {
-                MyAvatar.restoreRoleAnimation(ROLES[i]);
+
+            for (var i in OVERRIDEN_DRIVE_KEYS) {
+                MyAvatar.enableDriveKey(OVERRIDEN_DRIVE_KEYS[i]);
+            }
+
+            var roles = this.rolesToOverride();
+            for (i in roles) {
+                MyAvatar.restoreRoleAnimation(roles[i]);
             }
             MyAvatar.characterControllerEnabled = true;
             MyAvatar.hmdLeanRecenterEnabled = true;
@@ -165,6 +211,7 @@
                 MyAvatar.bodyRoll = 0.0;
             }, SIT_DELAY);
         }
+        this.sittingDown = false;
     }
 
     // function called by teleport.js if it detects the appropriate userData
@@ -215,7 +262,7 @@
     }
 
     this.update = function(dt) {
-        if (MyAvatar.sessionUUID === this.getSeatUser()) {
+        if (this.sittingDown === true) {
             var properties = Entities.getEntityProperties(this.entityID);
             var avatarDistance = Vec3.distance(MyAvatar.position, properties.position);
             var ikError = MyAvatar.getIKErrorOnLastSolve();
@@ -244,6 +291,9 @@
                 shouldStandUp = true;
             }
 
+            if (MyAvatar.sessionUUID !== this.getSeatUser()) {
+                shouldStandUp = true;
+            }
 
             if (shouldStandUp || avatarDistance > RELEASE_DISTANCE) {
                 print("IK error: " + ikError + ", distance from chair: " + avatarDistance);
@@ -253,7 +303,11 @@
                     var offset = { x: 0, y: 1.0, z: -0.5 - properties.dimensions.z * properties.registrationPoint.z };
                     var position = Vec3.sum(properties.position, Vec3.multiplyQbyV(properties.rotation, offset));
                     MyAvatar.position = position;
-                    print("Moving Avatar in front of the chair.")
+                    print("Moving Avatar in front of the chair.");
+                    // Delay standing up by 1 cycle.
+                    // This leaves times for the avatar to actually move since a lot
+                    // of the stand up operations are threaded
+                    return;
                 }
 
                 this.standUp();
@@ -289,7 +343,7 @@
         }
         this.cleanupOverlay();
     }
-
+    
     this.clickDownOnEntity = function (id, event) {
         if (isInEditMode()) {
             return;

@@ -16,6 +16,7 @@
 
 #include <QtOpenGL/QGLWidget>
 #include <QtGui/QImage>
+#include <QOpenGLFramebufferObject>
 #if defined(Q_OS_MAC)
 #include <OpenGL/CGLCurrent.h>
 #endif
@@ -41,7 +42,7 @@
 #include <ui-plugins/PluginContainer.h>
 #include <ui/Menu.h>
 #include <CursorManager.h>
-
+#include <TextureCache.h>
 #include "CompositorHelper.h"
 #include "Logging.h"
 #include <PathUtils.h>
@@ -316,7 +317,7 @@ bool OpenGLDisplayPlugin::activate() {
     if (isHmd() && (getHmdScreen() >= 0)) {
         _container->showDisplayPluginsTools();
     }
-    
+
     return Parent::activate();
 }
 
@@ -340,6 +341,18 @@ void OpenGLDisplayPlugin::deactivate() {
     Parent::deactivate();
 }
 
+bool OpenGLDisplayPlugin::startStandBySession() {
+    if (!activateStandBySession()) {
+        return false;
+    }
+    return Parent::startStandBySession();
+}
+
+void OpenGLDisplayPlugin::endSession() {
+    deactivateSession();
+    Parent::endSession();
+}
+
 void OpenGLDisplayPlugin::customizeContext() {
     auto presentThread = DependencyManager::get<PresentThread>();
     Q_ASSERT(thread() == presentThread->thread());
@@ -355,15 +368,17 @@ void OpenGLDisplayPlugin::customizeContext() {
             }
             if ((image.width() > 0) && (image.height() > 0)) {
 
-                cursorData.texture.reset(
-                    gpu::Texture::create2D(
+                cursorData.texture = gpu::Texture::createStrict(
                         gpu::Element(gpu::VEC4, gpu::NUINT8, gpu::RGBA), 
                         image.width(), image.height(), 
-                        gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_MIP_LINEAR)));
+                    gpu::Texture::MAX_NUM_MIPS,
+                    gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_MIP_LINEAR));
                 cursorData.texture->setSource("cursor texture");
                 auto usage = gpu::Texture::Usage::Builder().withColor().withAlpha();
                 cursorData.texture->setUsage(usage.build());
-                cursorData.texture->assignStoredMip(0, gpu::Element(gpu::VEC4, gpu::NUINT8, gpu::RGBA), image.byteCount(), image.constBits());
+                cursorData.texture->setStoredMipFormat(gpu::Element(gpu::VEC4, gpu::NUINT8, gpu::RGBA));
+                cursorData.texture->assignStoredMip(0, image.byteCount(), image.constBits());
+                cursorData.texture->setAutoGenerateMips(true);
             }
         }
     }
@@ -486,6 +501,49 @@ void OpenGLDisplayPlugin::submitFrame(const gpu::FramePointer& newFrame) {
     });
 }
 
+void OpenGLDisplayPlugin::renderFromTexture(gpu::Batch& batch, const gpu::TexturePointer texture, glm::ivec4 viewport, const glm::ivec4 scissor) {
+    renderFromTexture(batch, texture, viewport, scissor, gpu::FramebufferPointer());
+}
+
+void OpenGLDisplayPlugin::renderFromTexture(gpu::Batch& batch, const gpu::TexturePointer texture, glm::ivec4 viewport, const glm::ivec4 scissor, gpu::FramebufferPointer copyFbo /*=gpu::FramebufferPointer()*/) {
+    auto fbo = gpu::FramebufferPointer();
+    batch.enableStereo(false);
+    batch.resetViewTransform();
+    batch.setFramebuffer(fbo);
+    batch.clearColorFramebuffer(gpu::Framebuffer::BUFFER_COLOR0, vec4(0));
+    batch.setStateScissorRect(scissor);
+    batch.setViewportTransform(viewport);
+    batch.setResourceTexture(0, texture);
+    batch.setPipeline(_presentPipeline);
+    batch.draw(gpu::TRIANGLE_STRIP, 4);
+    if (copyFbo) {
+        gpu::Vec4i copyFboRect(0, 0, copyFbo->getWidth(), copyFbo->getHeight());
+        gpu::Vec4i sourceRect(scissor.x, scissor.y, scissor.x + scissor.z, scissor.y + scissor.w);
+        float aspectRatio = (float)scissor.w / (float) scissor.z; // height/width
+        // scale width first
+        int xOffset = 0;
+        int yOffset = 0;
+        int newWidth = copyFbo->getWidth();
+        int newHeight = std::round(aspectRatio * (float) copyFbo->getWidth());
+        if (newHeight > copyFbo->getHeight()) {
+            // ok, so now fill height instead
+            newHeight = copyFbo->getHeight();
+            newWidth = std::round((float)copyFbo->getHeight() / aspectRatio);
+            xOffset = (copyFbo->getWidth() - newWidth) / 2;
+        } else {
+            yOffset = (copyFbo->getHeight() - newHeight) / 2;
+        }
+        gpu::Vec4i copyRect(xOffset, yOffset, xOffset + newWidth, yOffset + newHeight);
+        batch.setFramebuffer(copyFbo);
+
+        batch.resetViewTransform();
+        batch.setViewportTransform(copyFboRect);
+        batch.setStateScissorRect(copyFboRect);
+        batch.clearColorFramebuffer(gpu::Framebuffer::BUFFER_COLOR0, {0.0f, 0.0f, 0.0f, 1.0f});
+        batch.blit(fbo, sourceRect, copyFbo, copyRect);
+    }
+}
+
 void OpenGLDisplayPlugin::updateFrameData() {
     PROFILE_RANGE(render, __FUNCTION__)
     if (_lockCurrentTexture) {
@@ -588,10 +646,15 @@ void OpenGLDisplayPlugin::compositeLayers() {
         compositeScene();
     }
 
+
+#ifdef HIFI_ENABLE_NSIGHT_DEBUG
+    if (false) // do not compositeoverlay if running nsight debug
+#endif
     {
         PROFILE_RANGE_EX(render_detail, "compositeOverlay", 0xff0077ff, (uint64_t)presentCount())
         compositeOverlay();
     }
+
     auto compositorHelper = DependencyManager::get<CompositorHelper>();
     if (compositorHelper->getReticleVisible()) {
         PROFILE_RANGE_EX(render_detail, "compositePointer", 0xff0077ff, (uint64_t)presentCount())
@@ -609,19 +672,10 @@ void OpenGLDisplayPlugin::prepareFrameBuffer() { }
 void OpenGLDisplayPlugin::internalPresent() {
 
     render([&](gpu::Batch& batch) {
-        batch.enableStereo(false);
-        batch.resetViewTransform();
-        batch.setFramebuffer(gpu::FramebufferPointer());
-        batch.setViewportTransform(ivec4(uvec2(0), getSurfacePixels()));
-
-#if HAS_COMPOSITE_FRAME_BUFFER //ndef ANDROID
-        batch.setResourceTexture(0, _compositeFramebuffer->getRenderBuffer(0));
-#else
-        batch.setResourceTexture(0, _currentFrame->framebuffer->getRenderBuffer(0));
-#endif
-        batch.setPipeline(_presentPipeline);
-        batch.draw(gpu::TRIANGLE_STRIP, 4);
-        
+        // Note: _displayTexture must currently be the same size as the display.
+        uvec2 dims = _displayTexture ? uvec2(_displayTexture->getDimensions()) : getSurfacePixels();
+        auto viewport = ivec4(uvec2(0),  dims);
+        renderFromTexture(batch, _displayTexture ? _displayTexture : _compositeFramebuffer->getRenderBuffer(0), viewport, viewport);
     });
     swapBuffers();
     _presentRate.increment();
@@ -673,7 +727,7 @@ void OpenGLDisplayPlugin::present() {
             internalPresent();
         }
 
-        gpu::Backend::setFreeGPUMemory(gpu::gl::getFreeDedicatedMemory());
+        gpu::Backend::freeGPUMemSize.set(gpu::gl::getFreeDedicatedMemory());
     }
 }
 
@@ -710,6 +764,22 @@ void OpenGLDisplayPlugin::withMainThreadContext(std::function<void()> f) const {
     static auto presentThread = DependencyManager::get<PresentThread>();
     presentThread->withMainThreadContext(f);
     _container->makeRenderingContextCurrent();
+}
+
+bool OpenGLDisplayPlugin::setDisplayTexture(const QString& name) {
+    // Note: it is the caller's responsibility to keep the network texture in cache.
+    if (name.isEmpty()) {
+        _displayTexture.reset();
+        onDisplayTextureReset();
+        return true;
+    }
+    auto textureCache = DependencyManager::get<TextureCache>();
+    auto displayNetworkTexture = textureCache->getTexture(name);
+    if (!displayNetworkTexture) {
+        return false;
+    }
+    _displayTexture = displayNetworkTexture->getGPUTexture();
+    return !!_displayTexture;
 }
 
 QImage OpenGLDisplayPlugin::getScreenshot(float aspectRatio) const {
@@ -828,3 +898,53 @@ void OpenGLDisplayPlugin::updateCompositeFramebuffer() {
     }
 #endif
 }
+
+void OpenGLDisplayPlugin::copyTextureToQuickFramebuffer(NetworkTexturePointer networkTexture, QOpenGLFramebufferObject* target, GLsync* fenceSync) {
+    auto glBackend = const_cast<OpenGLDisplayPlugin&>(*this).getGLBackend();
+    withMainThreadContext([&] {
+        GLuint sourceTexture = glBackend->getTextureID(networkTexture->getGPUTexture());
+        GLuint targetTexture = target->texture();
+        GLuint fbo[2] {0, 0};
+
+        // need mipmaps for blitting texture
+        glGenerateTextureMipmap(sourceTexture);
+
+        // create 2 fbos (one for initial texture, second for scaled one)
+        glCreateFramebuffers(2, fbo);
+
+        // setup source fbo
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sourceTexture, 0);
+
+        GLint texWidth = networkTexture->getWidth();
+        GLint texHeight = networkTexture->getHeight();
+
+        // setup destination fbo
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[1]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, targetTexture, 0);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+
+        // maintain aspect ratio, filling the width first if possible.  If that makes the height too
+        // much, fill height instead. TODO: only do this when texture changes
+        GLint newX = 0;
+        GLint newY = 0;
+        float aspectRatio = (float)texHeight / (float)texWidth;
+        GLint newWidth = target->width();
+        GLint newHeight = std::round(aspectRatio * (float) target->width());
+        if (newHeight > target->height()) {
+            newHeight = target->height();
+            newWidth = std::round((float)target->height() / aspectRatio);
+            newX = (target->width() - newWidth) / 2;
+        } else {
+            newY = (target->height() - newHeight) / 2;
+        }
+        glBlitNamedFramebuffer(fbo[0], fbo[1], 0, 0, texWidth, texHeight, newX, newY, newX + newWidth, newY + newHeight, GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        // don't delete the textures!
+        glDeleteFramebuffers(2, fbo);
+        *fenceSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    });
+}
+
