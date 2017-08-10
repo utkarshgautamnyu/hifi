@@ -110,8 +110,8 @@ QUrl expandScriptUrl(const QUrl& rawScriptURL) {
             // stop something like Script.include(["/~/../Desktop/naughty.js"]); from working
             QFileInfo fileInfo(url.toLocalFile());
             url = QUrl::fromLocalFile(fileInfo.canonicalFilePath());
-
-            QUrl defaultScriptsLoc = PathUtils::defaultScriptsLocation();
+            QFileInfo defaultScriptFileInfo(defaultScriptsLocation().toLocalFile());
+            QUrl defaultScriptsLoc = QUrl::fromLocalFile(defaultScriptFileInfo.canonicalFilePath());
             if (!defaultScriptsLoc.isParentOf(url)) {
                 qCWarning(scriptengine) << "Script.include() ignoring file path" << rawScriptURL
                                         << "-- outside of standard libraries: "
@@ -283,7 +283,6 @@ void ScriptEngines::loadOneScript(const QString& scriptFilename) {
 }
 
 void ScriptEngines::loadScripts() {
-#ifndef ANDROID
     // START BACKWARD COMPATIBILITY CODE
     // The following code makes sure people don't lose all their scripts
     // This should be removed after a reasonable ammount of time went by
@@ -302,9 +301,9 @@ void ScriptEngines::loadScripts() {
     settings.endArray();
     if (foundDeprecatedSetting) {
         // Remove old settings found and return
-        settings.beginWriteArray(SETTINGS_KEY);
-        settings.remove("");
-        settings.endArray();
+    settings.beginWriteArray(SETTINGS_KEY);
+    settings.remove("");
+    settings.endArray();
         settings.remove(SETTINGS_KEY + "/size");
         return;
     }
@@ -318,14 +317,6 @@ void ScriptEngines::loadScripts() {
             loadScript(string);
         }
     }
-#else
-    // always load defaultScripts for Android
-    qCDebug(scriptengine) << "This is a first run...";
-    // clear the scripts, and set out script to our default scripts
-    clearScripts();
-    loadDefaultScripts();
-    return;
-#endif
 }
 
 void ScriptEngines::saveScripts() {
@@ -351,8 +342,8 @@ void ScriptEngines::saveScripts() {
             if (it.value() && it.value()->isUserLoaded()) {
                 auto normalizedUrl = normalizeScriptURL(it.key());
                 list.append(normalizedUrl.toString());
-            }
         }
+    }
     }
 
     runningScriptsHandle.set(list);

@@ -111,7 +111,7 @@ QAudioDeviceInfo AudioClient::getActiveAudioDevice(QAudio::Mode mode) const {
         return _inputDeviceInfo;
     } else { // if (mode == QAudio::AudioOutput)
         return _outputDeviceInfo;
-                }
+    }
 }
 
 QList<QAudioDeviceInfo> AudioClient::getAudioDevices(QAudio::Mode mode) const {
@@ -274,9 +274,6 @@ void AudioClient::cleanupBeforeQuit() {
 
     stop();
     _checkDevicesTimer->stop();
-#ifdef ANDROID
-    _shouldRestartInputSetup = false; // intended stop should not restart the audio device
-#endif
     guard.trigger();
 }
 
@@ -634,7 +631,7 @@ void AudioClient::handleAudioEnvironmentDataPacket(QSharedPointer<ReceivedMessag
     message->readPrimitive(&bitset);
 
     bool hasReverb = oneAtBit(bitset, HAS_REVERB_BIT);
-    
+
     if (hasReverb) {
         float reverbTime, wetLevel;
         message->readPrimitive(&reverbTime);
@@ -732,7 +729,7 @@ void AudioClient::Gate::flush() {
 void AudioClient::handleNoisyMutePacket(QSharedPointer<ReceivedMessage> message) {
     if (!_muted) {
         toggleMute();
-        
+
         // have the audio scripting interface emit a signal to say we were muted by the mixer
         emit mutedByMixer();
     }
@@ -741,7 +738,7 @@ void AudioClient::handleNoisyMutePacket(QSharedPointer<ReceivedMessage> message)
 void AudioClient::handleMuteEnvironmentPacket(QSharedPointer<ReceivedMessage> message) {
     glm::vec3 position;
     float radius;
-    
+
     message->readPrimitive(&position);
     message->readPrimitive(&radius);
 
@@ -774,7 +771,7 @@ void AudioClient::handleSelectedAudioFormat(QSharedPointer<ReceivedMessage> mess
 }
 
 void AudioClient::selectAudioFormat(const QString& selectedCodecName) {
-    
+
     _selectedCodecName = selectedCodecName;
 
     qCDebug(audioclient) << "Selected Codec:" << _selectedCodecName;
@@ -791,7 +788,7 @@ void AudioClient::selectAudioFormat(const QString& selectedCodecName) {
     for (auto& plugin : codecPlugins) {
         if (_selectedCodecName == plugin->getName()) {
             _codec = plugin;
-            _receivedAudioStream.setupCodec(plugin, _selectedCodecName, AudioConstants::STEREO); 
+            _receivedAudioStream.setupCodec(plugin, _selectedCodecName, AudioConstants::STEREO);
             _encoder = plugin->createEncoder(AudioConstants::SAMPLE_RATE, AudioConstants::MONO);
             qCDebug(audioclient) << "Selected Codec Plugin:" << _codec.get();
             break;
@@ -799,7 +796,7 @@ void AudioClient::selectAudioFormat(const QString& selectedCodecName) {
     }
 
 }
-   
+
 bool AudioClient::switchAudioDevice(QAudio::Mode mode, const QAudioDeviceInfo& deviceInfo) {
     auto device = deviceInfo;
 
@@ -1022,12 +1019,12 @@ void AudioClient::handleAudioInput(QByteArray& audioBuffer) {
         int32_t loudness = 0;
         assert(numSamples < 65536); // int32_t loudness cannot overflow
         bool didClip = false;
-            for (int i = 0; i < numSamples; ++i) {
+        for (int i = 0; i < numSamples; ++i) {
             const int32_t CLIPPING_THRESHOLD = (int32_t)(AudioConstants::MAX_SAMPLE_VALUE * 0.9f);
             int32_t sample = std::abs((int32_t)samples[i]);
             loudness += sample;
             didClip |= (sample > CLIPPING_THRESHOLD);
-            }
+        }
         _lastInputLoudness = (float)loudness / numSamples;
 
         if (didClip) {
@@ -1048,10 +1045,10 @@ void AudioClient::handleAudioInput(QByteArray& audioBuffer) {
     _audioGateOpen = audioGateOpen;
 
     if (openedInLastBlock) {
-            emit noiseGateOpened();
+        emit noiseGateOpened();
     } else if (closedInLastBlock) {
-            emit noiseGateClosed();
-        }
+        emit noiseGateClosed();
+    }
 
     // the codec must be flushed to silence before sending silent packets,
     // so delay the transition to silent packets by one packet after becoming silent.
@@ -1149,17 +1146,17 @@ void AudioClient::prepareLocalAudioInjectors(std::unique_ptr<Lock> localAudioLoc
         }
 
         // in case of a device switch, consider bufferCapacity volatile across iterations
-    if (_outputPeriod == 0) {
-        return;
-    }
+        if (_outputPeriod == 0) {
+            return;
+        }
 
-    int bufferCapacity = _localInjectorsStream.getSampleCapacity();
+        int bufferCapacity = _localInjectorsStream.getSampleCapacity();
         int maxOutputSamples = AudioConstants::NETWORK_FRAME_SAMPLES_PER_CHANNEL * AudioConstants::STEREO;
-    if (_localToOutputResampler) {
+        if (_localToOutputResampler) {
             maxOutputSamples =
-            _localToOutputResampler->getMaxOutput(AudioConstants::NETWORK_FRAME_SAMPLES_PER_CHANNEL) *
-            AudioConstants::STEREO;
-    }
+                _localToOutputResampler->getMaxOutput(AudioConstants::NETWORK_FRAME_SAMPLES_PER_CHANNEL) *
+                AudioConstants::STEREO;
+        }
 
         samplesNeeded = bufferCapacity - _localSamplesAvailable.load(std::memory_order_relaxed);
         if (samplesNeeded < maxOutputSamples) {
@@ -1225,7 +1222,7 @@ bool AudioClient::mixLocalAudioInjectors(float* mixBuffer) {
             // get one frame from the injector
             memset(_localScratchBuffer, 0, bytesToRead);
             if (0 < injectorBuffer->readData((char*)_localScratchBuffer, bytesToRead)) {
-                
+
                 if (injector->isAmbisonic()) {
 
                     // no distance attenuation
@@ -1254,35 +1251,35 @@ bool AudioClient::mixLocalAudioInjectors(float* mixBuffer) {
                     for (int i = 0; i < AudioConstants::NETWORK_FRAME_SAMPLES_STEREO; i++) {
                         mixBuffer[i] += convertToFloat(_localScratchBuffer[i]) * gain;
                     }
-                    
+
                 } else {
 
                     // calculate distance, gain and azimuth for hrtf
                     glm::vec3 relativePosition = injector->getPosition() - _positionGetter();
                     float distance = glm::max(glm::length(relativePosition), EPSILON);
-                    float gain = gainForSource(distance, injector->getVolume()); 
+                    float gain = gainForSource(distance, injector->getVolume());
                     float azimuth = azimuthForSource(relativePosition);
-                
+
                     // mono gets spatialized into mixBuffer
-                    injector->getLocalHRTF().render(_localScratchBuffer, mixBuffer, HRTF_DATASET_INDEX, 
+                    injector->getLocalHRTF().render(_localScratchBuffer, mixBuffer, HRTF_DATASET_INDEX,
                                                     azimuth, distance, gain, AudioConstants::NETWORK_FRAME_SAMPLES_PER_CHANNEL);
                 }
-            
+
             } else {
-                
+
                 qCDebug(audioclient) << "injector has no more data, marking finished for removal";
                 injector->finishLocalInjection();
                 injectorsToRemove.append(injector);
             }
 
         } else {
-            
+
             qCDebug(audioclient) << "injector has no local buffer, marking as finished for removal";
             injector->finishLocalInjection();
             injectorsToRemove.append(injector);
         }
     }
-    
+
     for (const AudioInjectorPointer& injector : injectorsToRemove) {
         qCDebug(audioclient) << "removing injector";
         _activeLocalAudioInjectors.removeOne(injector);
@@ -1378,7 +1375,7 @@ bool AudioClient::outputLocalInjector(const AudioInjectorPointer& injector) {
     AudioInjectorLocalBuffer* injectorBuffer = injector->getLocalBuffer();
     if (injectorBuffer) {
         // local injectors are on the AudioInjectorsThread, so we must guard access
-    Lock lock(_injectorsMutex);
+        Lock lock(_injectorsMutex);
         if (!_activeLocalAudioInjectors.contains(injector)) {
             qCDebug(audioclient) << "adding new injector";
             _activeLocalAudioInjectors.append(injector);
@@ -1390,7 +1387,7 @@ bool AudioClient::outputLocalInjector(const AudioInjectorPointer& injector) {
         } else {
             qCDebug(audioclient) << "injector exists in active list already";
         }
-        
+
         return true;
 
     } else {
@@ -1482,6 +1479,7 @@ bool AudioClient::switchInputToAudioDevice(const QAudioDeviceInfo& inputDeviceIn
                     connect(_audioInput, SIGNAL(stateChanged(QAudio::State)), this, SLOT(audioInputStateChanged(QAudio::State)));
                 }
 #endif
+                
                 _inputDevice = _audioInput->start();
 
                 if (_inputDevice) {
@@ -1746,9 +1744,9 @@ int AudioClient::calculateNumberOfFrameSamples(int numBytes) const {
 
 float AudioClient::azimuthForSource(const glm::vec3& relativePosition) {
     glm::quat inverseOrientation = glm::inverse(_orientationGetter());
-    
+
     glm::vec3 rotatedSourcePosition = inverseOrientation * relativePosition;
-    
+
     // project the rotated source position vector onto the XZ plane
     rotatedSourcePosition.y = 0.0f;
 
@@ -1756,7 +1754,7 @@ float AudioClient::azimuthForSource(const glm::vec3& relativePosition) {
 
     float rotatedSourcePositionLength2 = glm::length2(rotatedSourcePosition);
     if (rotatedSourcePositionLength2 > SOURCE_DISTANCE_THRESHOLD) {
-        
+
         // produce an oriented angle about the y-axis
         glm::vec3 direction = rotatedSourcePosition * (1.0f / fastSqrtf(rotatedSourcePositionLength2));
         float angle = fastAcosf(glm::clamp(-direction.z, -1.0f, 1.0f)); // UNIT_NEG_Z is "forward"
@@ -1764,7 +1762,7 @@ float AudioClient::azimuthForSource(const glm::vec3& relativePosition) {
 
     } else {
         // no azimuth if they are in same spot
-        return 0.0f; 
+        return 0.0f;
     }
 }
 

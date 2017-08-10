@@ -99,6 +99,52 @@ void DeferredLightingEffect::init() {
 
     loadLightProgram(deferred_light_vert, local_lights_shading_frag, true, _localLight, _localLightLocations);
     loadLightProgram(deferred_light_vert, local_lights_drawOutline_frag, true, _localLightOutline, _localLightOutlineLocations);
+
+    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
+    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
+    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
+    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
+
+    // Light Stage and clusters
+    _lightStage = std::make_shared<LightStage>();
+    
+    // Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
+    _allocatedLights.push_back(std::make_shared<model::Light>());
+    model::LightPointer lp = _allocatedLights[0];
+    lp->setType(model::Light::SUN);
+    lp->setDirection(glm::vec3(-1.0f));
+    lp->setColor(glm::vec3(1.0f));
+    lp->setIntensity(1.0f);
+    lp->setType(model::Light::SUN);
+    lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
+
+    // Add the global light to the light stage (for later shadow rendering)
+    _globalLights.push_back(_lightStage->addLight(lp));
+    _lightStage->addShadow(_globalLights[0]);
+
+
+    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
+    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
+    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
+    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
+*/
+    // Light Stage and clusters
+    _lightStage = std::make_shared<LightStage>();
+    
+    // Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
+    _allocatedLights.push_back(std::make_shared<model::Light>());
+    model::LightPointer lp = _allocatedLights[0];
+    lp->setType(model::Light::SUN);
+    lp->setDirection(glm::vec3(-1.0f));
+    lp->setColor(glm::vec3(1.0f));
+    lp->setIntensity(1.0f);
+    lp->setType(model::Light::SUN);
+    lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
+
+    // Add the global light to the light stage (for later shadow rendering)
+    _globalLights.push_back(_lightStage->addLight(lp));
+    _lightStage->addShadow(_globalLights[0]);
+
 }
 
 void DeferredLightingEffect::setupKeyLightBatch(const RenderArgs* args, gpu::Batch& batch, int lightBufferUnit, int ambientBufferUnit, int skyboxCubemapUnit) {
@@ -225,7 +271,6 @@ static void loadLightProgram(const char* vertSource, const char* fragSource, boo
     pipeline = gpu::Pipeline::create(program, state);
 
 }
-*/
 #include <shared/Shapes.h>
 
 model::MeshPointer DeferredLightingEffect::getPointLightMesh() {

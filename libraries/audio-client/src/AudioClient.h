@@ -395,12 +395,7 @@ private:
     RateCounter<> _audioOutbound;
     RateCounter<> _silentInbound;
     RateCounter<> _audioInbound;
-
     QTimer* _checkDevicesTimer { nullptr };
-#ifdef ANDROID
-    bool _shouldRestartInputSetup { true }; // Should we restart the input device because of an unintended stop?
-#endif
-
 };
 
 

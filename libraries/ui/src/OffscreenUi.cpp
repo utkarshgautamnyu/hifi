@@ -221,8 +221,8 @@ QQuickItem* OffscreenUi::createMessageBox(Icon icon, const QString& title, const
     TabletProxy* tablet = dynamic_cast<TabletProxy*>(tabletScriptingInterface->getTablet("com.highfidelity.interface.tablet.system"));
     if (tablet->getToolbarMode()) {
        invokeResult =  QMetaObject::invokeMethod(_desktop, "messageBox",
-        Q_RETURN_ARG(QVariant, result),
-        Q_ARG(QVariant, QVariant::fromValue(map)));
+                                  Q_RETURN_ARG(QVariant, result),
+                                  Q_ARG(QVariant, QVariant::fromValue(map)));
     } else {
         QQuickItem* tabletRoot = tablet->getTabletRoot();
         invokeResult =  QMetaObject::invokeMethod(tabletRoot, "messageBox",
@@ -429,8 +429,8 @@ QQuickItem* OffscreenUi::createInputDialog(const Icon icon, const QString& title
     bool invokeResult;
     if (tablet->getToolbarMode()) {
         invokeResult = QMetaObject::invokeMethod(_desktop, "inputDialog",
-        Q_RETURN_ARG(QVariant, result),
-        Q_ARG(QVariant, QVariant::fromValue(map)));
+                                                 Q_RETURN_ARG(QVariant, result),
+                                                 Q_ARG(QVariant, QVariant::fromValue(map)));
     } else {
         QQuickItem* tabletRoot = tablet->getTabletRoot();
         invokeResult = QMetaObject::invokeMethod(tabletRoot, "inputDialog",
@@ -457,8 +457,8 @@ QQuickItem* OffscreenUi::createCustomInputDialog(const Icon icon, const QString&
     bool invokeResult;
     if (tablet->getToolbarMode()) {
         invokeResult = QMetaObject::invokeMethod(_desktop, "inputDialog",
-                                                  Q_RETURN_ARG(QVariant, result),
-                                                  Q_ARG(QVariant, QVariant::fromValue(map)));
+                                                 Q_RETURN_ARG(QVariant, result),
+                                                 Q_ARG(QVariant, QVariant::fromValue(map)));
     } else {
         QQuickItem* tabletRoot = tablet->getTabletRoot();
         invokeResult = QMetaObject::invokeMethod(tabletRoot, "inputDialog",
@@ -466,7 +466,7 @@ QQuickItem* OffscreenUi::createCustomInputDialog(const Icon icon, const QString&
                                                  Q_ARG(QVariant, QVariant::fromValue(map)));
         emit tabletScriptingInterface->tabletNotification();
     }
-
+    
     if (!invokeResult) {
         qWarning() << "Failed to create custom message box";
         return nullptr;
@@ -622,8 +622,8 @@ QString OffscreenUi::fileDialog(const QVariantMap& properties) {
     } else {
         QQuickItem* tabletRoot = tablet->getTabletRoot();
         invokeResult =  QMetaObject::invokeMethod(tabletRoot, "fileDialog",
-        Q_RETURN_ARG(QVariant, buildDialogResult),
-        Q_ARG(QVariant, QVariant::fromValue(properties)));
+                                  Q_RETURN_ARG(QVariant, buildDialogResult),
+                                  Q_ARG(QVariant, QVariant::fromValue(properties)));
         emit tabletScriptingInterface->tabletNotification();
     }
 

@@ -17,6 +17,7 @@ void DisplayPlugin::incrementPresentCount() {
 #endif
 
     ++_presentedFrameIndex;
+
     {
         QMutexLocker locker(&_presentMutex);
         _presentCondition.wakeAll();

@@ -660,10 +660,7 @@ SharedNodePointer LimitedNodeList::addOrUpdateNode(const QUuid& uuid, NodeType_t
         }
 
         // insert the new node and release our read lock
-		//cgaggar: will break things. This comes from tbb file. fix after sorting out tbb download and building.
-		//CLIMAX_MERGE_START
-        //_nodeHash.emplace(newNode->getUUID(), newNodePointer);
-		//CLIMAX_MERGE_END
+        _nodeHash.emplace(newNode->getUUID(), newNodePointer);
         readLocker.unlock();
 
         qCDebug(networking) << "Added" << *newNode;

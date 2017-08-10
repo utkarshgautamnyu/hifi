@@ -131,8 +131,7 @@
 #ifndef ANDROID
 #include <steamworks-wrapper/SteamClient.h>
 #endif
-#include <ui/TabletScriptingInterface.h>
-#include <ui/ToolbarScriptingInterface.h>
+#include <TabletScriptingInterface.h>
 #include <Tooltip.h>
 #include <udt/PacketHeaders.h>
 #include <UserActivityLogger.h>
@@ -1679,218 +1678,11 @@ Application::Application(int& argc, char** argv, QElapsedTimer& startupTimer, bo
         const auto testScript = property(hifi::properties::TEST).toUrl();
         scriptEngines->loadScript(testScript, false);
     } else {
-        // Get sandbox content set version, if available
-        auto acDirPath = PathUtils::getRootDataDirectory() + BuildInfo::MODIFIED_ORGANIZATION + "/assignment-client/";
-        auto contentVersionPath = acDirPath + "content-version.txt";
-        qCDebug(interfaceapp) << "Checking " << contentVersionPath << " for content version";
-        auto contentVersion = 0;
-        QFile contentVersionFile(contentVersionPath);
-        if (contentVersionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QString line = contentVersionFile.readAll();
-            // toInt() returns 0 if the conversion fails, so we don't need to specifically check for failure
-            contentVersion = line.toInt();
-        }
-        qCDebug(interfaceapp) << "Server content version: " << contentVersion;
-
-        static const int MIN_VIVE_CONTENT_VERSION = 1;
-        static const int MIN_OCULUS_TOUCH_CONTENT_VERSION = 27;
-
-        bool hasSufficientTutorialContent = false;
-        bool hasHandControllers = false;
-
-        // Only specific hand controllers are currently supported, so only send users to the tutorial
-        // if they have one of those hand controllers.
-        if (PluginUtils::isViveControllerAvailable()) {
-            hasHandControllers = true;
-            hasSufficientTutorialContent = contentVersion >= MIN_VIVE_CONTENT_VERSION;
-        } else if (PluginUtils::isOculusTouchControllerAvailable()) {
-            hasHandControllers = true;
-            hasSufficientTutorialContent = contentVersion >= MIN_OCULUS_TOUCH_CONTENT_VERSION;
-        }
-
-        Setting::Handle<bool> firstRun { Settings::firstRun, true };
-
-        bool hasHMDAndHandControllers = PluginUtils::isHMDAvailable() && hasHandControllers;
-        Setting::Handle<bool> tutorialComplete { "tutorialComplete", false };
-
-        bool shouldGoToTutorial = hasHMDAndHandControllers && hasSufficientTutorialContent && !tutorialComplete.get();
-
-        qCDebug(interfaceapp) << "Has HMD + Hand Controllers: " << hasHMDAndHandControllers << ", current plugin: " << _displayPlugin->getName();
-        qCDebug(interfaceapp) << "Has sufficient tutorial content (" << contentVersion << ") : " << hasSufficientTutorialContent;
-        qCDebug(interfaceapp) << "Tutorial complete: " << tutorialComplete.get();
-        qCDebug(interfaceapp) << "Should go to tutorial: " << shouldGoToTutorial;
-
-        // when --url in command line, teleport to location
-        const QString HIFI_URL_COMMAND_LINE_KEY = "--url";
-        int urlIndex = arguments().indexOf(HIFI_URL_COMMAND_LINE_KEY);
-        QString addressLookupString;
-        if (urlIndex != -1) {
-            addressLookupString = arguments().value(urlIndex + 1);
-        }
-
-        const QString TUTORIAL_PATH = "/tutorial_begin";
-
-        if (shouldGoToTutorial) {
-            if (sandboxIsRunning) {
-                qCDebug(interfaceapp) << "Home sandbox appears to be running, going to Home.";
-                DependencyManager::get<AddressManager>()->goToLocalSandbox(TUTORIAL_PATH);
-            } else {
-                qCDebug(interfaceapp) << "Home sandbox does not appear to be running, going to Entry.";
-                if (firstRun.get()) {
-                    showHelp();
-                }
-                if (addressLookupString.isEmpty()) {
-                    DependencyManager::get<AddressManager>()->goToEntry();
-                } else {
-                    DependencyManager::get<AddressManager>()->loadSettings(addressLookupString);
-                }
-            }
-        } else {
-
-            bool isFirstRun = firstRun.get();
-
-            if (isFirstRun) {
-                showHelp();
-            }
-
-            // If this is a first run we short-circuit the address passed in
-            if (isFirstRun) {
-                if (hasHMDAndHandControllers) {
-                    if (sandboxIsRunning) {
-                        qCDebug(interfaceapp) << "Home sandbox appears to be running, going to Home.";
-                        DependencyManager::get<AddressManager>()->goToLocalSandbox();
-                    } else {
-                        qCDebug(interfaceapp) << "Home sandbox does not appear to be running, going to Entry.";
-                        DependencyManager::get<AddressManager>()->goToEntry();
-                    }
-                } else {
-                    DependencyManager::get<AddressManager>()->goToEntry();
-                }
-            } else {
-                qCDebug(interfaceapp) << "Not first run... going to" << qPrintable(addressLookupString.isEmpty() ? QString("previous location") : addressLookupString);
-                DependencyManager::get<AddressManager>()->loadSettings(addressLookupString);
-            }
-        }
-
-        _connectionMonitor.init();
-
-        // After all of the constructor is completed, then set firstRun to false.
-        firstRun.set(false);
         PROFILE_RANGE(render, "GetSandboxStatus");
         auto reply = SandboxUtils::getStatus();
         connect(reply, &QNetworkReply::finished, this, [=] {
             handleSandboxStatus(reply);
         });
-        // Get sandbox content set version, if available
-        auto acDirPath = PathUtils::getRootDataDirectory() + BuildInfo::MODIFIED_ORGANIZATION + "/assignment-client/";
-        auto contentVersionPath = acDirPath + "content-version.txt";
-        qCDebug(interfaceapp) << "Checking " << contentVersionPath << " for content version";
-        auto contentVersion = 0;
-        QFile contentVersionFile(contentVersionPath);
-        if (contentVersionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QString line = contentVersionFile.readAll();
-            // toInt() returns 0 if the conversion fails, so we don't need to specifically check for failure
-            contentVersion = line.toInt();
-        }
-        qCDebug(interfaceapp) << "Server content version: " << contentVersion;
-
-        static const int MIN_VIVE_CONTENT_VERSION = 1;
-        static const int MIN_OCULUS_TOUCH_CONTENT_VERSION = 27;
-
-        bool hasSufficientTutorialContent = false;
-        bool hasHandControllers = false;
-
-        // Only specific hand controllers are currently supported, so only send users to the tutorial
-        // if they have one of those hand controllers.
-        if (PluginUtils::isViveControllerAvailable()) {
-            hasHandControllers = true;
-            hasSufficientTutorialContent = contentVersion >= MIN_VIVE_CONTENT_VERSION;
-        } else if (PluginUtils::isOculusTouchControllerAvailable()) {
-            hasHandControllers = true;
-            hasSufficientTutorialContent = contentVersion >= MIN_OCULUS_TOUCH_CONTENT_VERSION;
-        }
-
-        Setting::Handle<bool> firstRun { Settings::firstRun, true };
-
-        bool hasHMDAndHandControllers = PluginUtils::isHMDAvailable() && hasHandControllers;
-        Setting::Handle<bool> tutorialComplete { "tutorialComplete", false };
-
-        bool shouldGoToTutorial = hasHMDAndHandControllers && hasSufficientTutorialContent && !tutorialComplete.get();
-
-        qCDebug(interfaceapp) << "Has HMD + Hand Controllers: " << hasHMDAndHandControllers << ", current plugin: " << _displayPlugin->getName();
-        qCDebug(interfaceapp) << "Has sufficient tutorial content (" << contentVersion << ") : " << hasSufficientTutorialContent;
-        qCDebug(interfaceapp) << "Tutorial complete: " << tutorialComplete.get();
-        qCDebug(interfaceapp) << "Should go to tutorial: " << shouldGoToTutorial;
-
-        // when --url in command line, teleport to location
-        const QString HIFI_URL_COMMAND_LINE_KEY = "--url";
-        int urlIndex = arguments().indexOf(HIFI_URL_COMMAND_LINE_KEY);
-        QString addressLookupString;
-        if (urlIndex != -1) {
-            addressLookupString = arguments().value(urlIndex + 1);
-        }
-
-        const QString TUTORIAL_PATH = "/tutorial_begin";
-
-#ifdef ANDROID
-        //DependencyManager::get<AddressManager>()->handleLookupString("hifi://android/0.0,0.0,-200");
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/0.257461,0,-5.11505");
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/1494,-4.2,-1511.1"); // furniture
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/3000.00,1.03495,3000.00"); // boxes and architecture (stress test?)
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/1979,0.43495,-955"); // office
-    DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/0.0,0.0,0.0"); // apt working
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/192,-5000,-198"); // apt
-    //DependencyManager::get<AddressManager>()->handleLookupString("dev-mobile.highfidelity.io/-500,0,-600"); // no material apt
-
-    // Turn off the bubble for android by now
-    DependencyManager::get<NodeList>()->ignoreNodesInRadius(false);
-#else
-        if (shouldGoToTutorial) {
-            if (sandboxIsRunning) {
-                qCDebug(interfaceapp) << "Home sandbox appears to be running, going to Home.";
-                DependencyManager::get<AddressManager>()->goToLocalSandbox(TUTORIAL_PATH);
-            } else {
-                qCDebug(interfaceapp) << "Home sandbox does not appear to be running, going to Entry.";
-                if (firstRun.get()) {
-                    showHelp();
-                }
-                if (addressLookupString.isEmpty()) {
-                    DependencyManager::get<AddressManager>()->goToEntry();
-                } else {
-                    DependencyManager::get<AddressManager>()->loadSettings(addressLookupString);
-                }
-            }
-        } else {
-
-            bool isFirstRun = firstRun.get();
-
-            if (isFirstRun) {
-                showHelp();
-            }
-
-            // If this is a first run we short-circuit the address passed in
-            if (isFirstRun) {
-                if (hasHMDAndHandControllers) {
-                    if(sandboxIsRunning) {
-                        qCDebug(interfaceapp) << "Home sandbox appears to be running, going to Home.";
-                        DependencyManager::get<AddressManager>()->goToLocalSandbox();
-                    } else {
-                        qCDebug(interfaceapp) << "Home sandbox does not appear to be running, going to Entry.";
-                        DependencyManager::get<AddressManager>()->goToEntry();
-                    }
-                } else {
-                    DependencyManager::get<AddressManager>()->goToEntry();
-                }
-            } else {
-                qCDebug(interfaceapp) << "Not first run... going to" << qPrintable(addressLookupString.isEmpty() ? QString("previous location") : addressLookupString);
-                DependencyManager::get<AddressManager>()->loadSettings(addressLookupString);
-            }
-        }
-#endif
-        _connectionMonitor.init();
-
-        // After all of the constructor is completed, then set firstRun to false.
-        firstRun.set(false);
     }
     // Monitor model assets (e.g., from Clara.io) added to the world that may need resizing.
     static const int ADD_ASSET_TO_WORLD_TIMER_INTERVAL_MS = 1000;
@@ -2534,7 +2326,6 @@ void Application::paintGL() {
     }
 
 
-    #if 1 //ndef ANDROID
     {
         PROFILE_RANGE(render, "/renderOverlay");
         PerformanceTimer perfTimer("renderOverlay");
@@ -2544,7 +2335,6 @@ void Application::paintGL() {
         renderArgs._viewport = glm::ivec4(0, 0, size.width(), size.height());
         _applicationOverlay.renderOverlay(&renderArgs);
     }
-    #endif
 
     glm::vec3 boomOffset;
     {

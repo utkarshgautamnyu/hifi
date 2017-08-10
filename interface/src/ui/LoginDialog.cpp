@@ -18,10 +18,10 @@
 
 #include <NetworkingConstants.h>
 #include <plugins/PluginManager.h>
-#include <ui/TabletScriptingInterface.h>
 #ifndef ANDROID
 #include <plugins/SteamClientPlugin.h>
 #endif
+#include <ui/TabletScriptingInterface.h>
 #include "AccountManager.h"
 #include "DependencyManager.h"
 #include "Menu.h"
@@ -36,7 +36,7 @@ LoginDialog::LoginDialog(QQuickItem *parent) : OffscreenQmlDialog(parent) {
     connect(accountManager.data(), &AccountManager::loginComplete,
         this, &LoginDialog::handleLoginCompleted);
     connect(accountManager.data(), &AccountManager::loginFailed,
-        this, &LoginDialog::handleLoginFailed);
+            this, &LoginDialog::handleLoginFailed);
 }
 
 void LoginDialog::showWithSelection()
@@ -183,8 +183,8 @@ void LoginDialog::openUrl(const QString& url) const {
         browser->setProperty("url", url);
     } else {
         if (!hmd->getShouldShowTablet() && !qApp->isHMDMode()) {
-    auto browser = offscreenUi->load("Browser.qml");
-    browser->setProperty("url", url);
+            auto browser = offscreenUi->load("Browser.qml");
+            browser->setProperty("url", url);
         } else {
             tablet->gotoWebScreen(url);
         }

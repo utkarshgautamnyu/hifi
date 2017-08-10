@@ -58,14 +58,14 @@ void AssetClient::init() {
     // Setup disk cache if not already
     auto& networkAccessManager = NetworkAccessManager::getInstance();
     if (!networkAccessManager.cache()) {
- 		if (_cacheDir.isEmpty()) {
+	if (_cacheDir.isEmpty()) {
 	#ifdef ANDROID
-        QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+       	QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 	#else
 		QString cachePath = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
 	#endif
         _cacheDir = !cachePath.isEmpty() ? cachePath : "interfaceCache";
-		}
+	}
         QNetworkDiskCache* cache = new QNetworkDiskCache();
         cache->setMaximumCacheSize(MAXIMUM_CACHE_SIZE);
         cache->setCacheDirectory(_cacheDir);

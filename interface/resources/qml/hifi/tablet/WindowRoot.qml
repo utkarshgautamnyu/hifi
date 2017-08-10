@@ -100,7 +100,7 @@ Windows.ScrollingWindow {
         }
 
         onLoaded: {
-			parent.y = 0
+            parent.y = 0
             if (loader.item.hasOwnProperty("sendToScript")) {
                 loader.item.sendToScript.connect(tabletRoot.sendToScript);
             }

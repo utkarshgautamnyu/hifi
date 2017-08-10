@@ -47,26 +47,12 @@ void RenderForwardTask::build(JobModel& task, const render::Varying& input, rend
 
     const auto framebuffer = task.addJob<PrepareFramebuffer>("PrepareFramebuffer");
 
-    const auto lightingModel = task.addJob<MakeLightingModel>("LightingModel");
-
-    const auto opaqueInputs = DrawDeferred::Inputs(opaques, lightingModel).hasVarying();
-    task.addJob<Draw>("DrawOpaques", opaqueInputs, shapePlumber);
-    
+    task.addJob<Draw>("DrawOpaques", opaques, shapePlumber);
     task.addJob<Stencil>("Stencil");
     task.addJob<DrawBackground>("DrawBackground", background);
 
     // Bounds do not draw on stencil buffer, so they must come last
-    //task.addJob<DrawBounds>("DrawBounds", opaques);
-    
-    // Overlays
-    const auto overlayOpaquesInputs = DrawOverlay3D::Inputs(overlayOpaques, lightingModel).hasVarying();
-    const auto overlayTransparentsInputs = DrawOverlay3D::Inputs(overlayTransparents, lightingModel).hasVarying();
-    task.addJob<DrawOverlay3D>("DrawOverlay3DOpaque", overlayOpaquesInputs, true);
-    task.addJob<DrawOverlay3D>("DrawOverlay3DTransparent", overlayTransparentsInputs, false);
-    
-    // Render transparent objects forward in LightingBuffer
-    const auto transparentsInputs = DrawDeferred::Inputs(transparents, lightingModel).hasVarying();
-    task.addJob<DrawTransparentDeferred>("DrawTransparentDeferred", transparentsInputs, shapePlumber);
+    task.addJob<DrawBounds>("DrawBounds", opaques);
 
     // Blit!
     task.addJob<Blit>("Blit", framebuffer);
