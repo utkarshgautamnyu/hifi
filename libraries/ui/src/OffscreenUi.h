@@ -21,9 +21,9 @@
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QInputDialog>
 
-#include <gl/OffscreenQmlSurface.h>
 #include <DependencyManager.h>
 
+#include "ui/OffscreenQmlSurface.h"
 #include "OffscreenQmlElement.h"
 
 class VrMenu;
@@ -118,12 +118,16 @@ public:
     Q_INVOKABLE QString fileSaveDialog(const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
     Q_INVOKABLE QString existingDirectoryDialog(const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
 
+    Q_INVOKABLE QString assetOpenDialog(const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
+
     // Compatibility with QFileDialog::getOpenFileName
     static QString getOpenFileName(void* ignored, const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
     // Compatibility with QFileDialog::getSaveFileName
     static QString getSaveFileName(void* ignored, const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
     // Compatibility with QFileDialog::getExistingDirectory
     static QString getExistingDirectory(void* ignored, const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
+
+    static QString getOpenAssetName(void* ignored, const QString &caption = QString(), const QString &dir = QString(), const QString &filter = QString(), QString *selectedFilter = 0, QFileDialog::Options options = 0);
 
     Q_INVOKABLE QVariant inputDialog(const Icon icon, const QString& title, const QString& label = QString(), const QVariant& current = QVariant());
     Q_INVOKABLE QVariant customInputDialog(const Icon icon, const QString& title, const QVariantMap& config);
@@ -155,6 +159,7 @@ signals:
 
 private:
     QString fileDialog(const QVariantMap& properties);
+    QString assetDialog(const QVariantMap& properties);
 
     QQuickItem* _desktop { nullptr };
     QQuickItem* _toolWindow { nullptr };

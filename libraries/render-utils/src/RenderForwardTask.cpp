@@ -15,7 +15,6 @@
 
 #include <PerfStat.h>
 #include <PathUtils.h>
-#include <RenderArgs.h>
 #include <ViewFrustum.h>
 #include <gpu/Context.h>
 
@@ -29,7 +28,9 @@
 using namespace render;
 extern void initForwardPipelines(ShapePlumber& plumber);
 
-RenderForwardTask::RenderForwardTask(RenderFetchCullSortTask::Output items) {
+void RenderForwardTask::build(JobModel& task, const render::Varying& input, render::Varying& output) {
+    auto items = input.get<Input>();
+
     // Prepare the ShapePipelines
     ShapePlumberPointer shapePlumber = std::make_shared<ShapePlumber>();
     initForwardPipelines(*shapePlumber);
@@ -44,34 +45,20 @@ RenderForwardTask::RenderForwardTask(RenderFetchCullSortTask::Output items) {
     const auto background = items[RenderFetchCullSortTask::BACKGROUND];
     const auto spatialSelection = items[RenderFetchCullSortTask::SPATIAL_SELECTION];
 
-    const auto framebuffer = addJob<PrepareFramebuffer>("PrepareFramebuffer");
+    const auto framebuffer = task.addJob<PrepareFramebuffer>("PrepareFramebuffer");
 
-    const auto lightingModel = addJob<MakeLightingModel>("LightingModel");
+    task.addJob<Draw>("DrawOpaques", opaques, shapePlumber);
+    task.addJob<Stencil>("Stencil");
+    task.addJob<DrawBackground>("DrawBackground", background);
 
-    const auto opaqueInputs = DrawDeferred::Inputs(opaques, lightingModel).hasVarying();
-    addJob<Draw>("DrawOpaques", opaqueInputs, shapePlumber);
-    
-    addJob<Stencil>("Stencil");
-    addJob<DrawBackground>("DrawBackground", background);
-    
     // Bounds do not draw on stencil buffer, so they must come last
-    //addJob<DrawBounds>("DrawBounds", opaques);
-    
-    // Overlays
-    const auto overlayOpaquesInputs = DrawOverlay3D::Inputs(overlayOpaques, lightingModel).hasVarying();
-    const auto overlayTransparentsInputs = DrawOverlay3D::Inputs(overlayTransparents, lightingModel).hasVarying();
-    addJob<DrawOverlay3D>("DrawOverlay3DOpaque", overlayOpaquesInputs, true);
-    addJob<DrawOverlay3D>("DrawOverlay3DTransparent", overlayTransparentsInputs, false);
-    
-    // Render transparent objects forward in LightingBuffer
-    const auto transparentsInputs = DrawDeferred::Inputs(transparents, lightingModel).hasVarying();
-    addJob<DrawTransparentDeferred>("DrawTransparentDeferred", transparentsInputs, shapePlumber);
-    
+    task.addJob<DrawBounds>("DrawBounds", opaques);
+
     // Blit!
-    addJob<Blit>("Blit", framebuffer);
+    task.addJob<Blit>("Blit", framebuffer);
 }
 
-void PrepareFramebuffer::run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext,
+void PrepareFramebuffer::run(const RenderContextPointer& renderContext,
         gpu::FramebufferPointer& framebuffer) {
     auto framebufferCache = DependencyManager::get<FramebufferCache>();
     auto framebufferSize = framebufferCache->getFrameBufferSize();
@@ -87,11 +74,11 @@ void PrepareFramebuffer::run(const SceneContextPointer& sceneContext, const Rend
 
         auto colorFormat = gpu::Element::COLOR_SRGBA_32;
         auto defaultSampler = gpu::Sampler(gpu::Sampler::FILTER_MIN_MAG_POINT);
-        auto colorTexture = gpu::TexturePointer(gpu::Texture::create2D(colorFormat, frameSize.x, frameSize.y, defaultSampler));
+        auto colorTexture = gpu::Texture::create2D(colorFormat, frameSize.x, frameSize.y, gpu::Texture::SINGLE_MIP, defaultSampler);
         _framebuffer->setRenderBuffer(0, colorTexture);
 
         auto depthFormat = gpu::Element(gpu::SCALAR, gpu::UINT32, gpu::DEPTH_STENCIL); // Depth24_Stencil8 texel format
-        auto depthTexture = gpu::TexturePointer(gpu::Texture::create2D(depthFormat, frameSize.x, frameSize.y, defaultSampler));
+        auto depthTexture = gpu::Texture::create2D(depthFormat, frameSize.x, frameSize.y, gpu::Texture::SINGLE_MIP, defaultSampler);
         _framebuffer->setDepthStencilBuffer(depthTexture, depthFormat);
     }
 
@@ -112,7 +99,7 @@ void PrepareFramebuffer::run(const SceneContextPointer& sceneContext, const Rend
     framebuffer = _framebuffer;
 }
 
-void Draw::run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext,
+void Draw::run(const RenderContextPointer& renderContext,
         const Inputs& inputs) {
     RenderArgs* args = renderContext->args;
 
@@ -135,7 +122,7 @@ void Draw::run(const SceneContextPointer& sceneContext, const RenderContextPoint
         batch.setUniformBuffer(render::ShapePipeline::Slot::LIGHTING_MODEL, lightingModel->getParametersBuffer());
 
         // Render items
-        renderStateSortShapes(sceneContext, renderContext, _shapePlumber, inItems, -1);
+        renderStateSortShapes(renderContext, _shapePlumber, inItems, -1);
     });
     args->_batch = nullptr;
 }
@@ -187,7 +174,7 @@ const gpu::PipelinePointer Stencil::getPipeline() {
     return _stencilPipeline;
 }
 
-void Stencil::run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext) {
+void Stencil::run(const RenderContextPointer& renderContext) {
     RenderArgs* args = renderContext->args;
 
     gpu::doInBatch(args->_context, [&](gpu::Batch& batch) {
@@ -203,7 +190,7 @@ void Stencil::run(const SceneContextPointer& sceneContext, const RenderContextPo
     args->_batch = nullptr;
 }
 
-void DrawBackground::run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext,
+void DrawBackground::run(const RenderContextPointer& renderContext,
         const Inputs& background) {
     RenderArgs* args = renderContext->args;
 
@@ -222,7 +209,7 @@ void DrawBackground::run(const SceneContextPointer& sceneContext, const RenderCo
         batch.setProjectionTransform(projMat);
         batch.setViewTransform(viewMat);*/
 
-        renderItems(sceneContext, renderContext, background);
+        renderItems(renderContext, background);
     });
     args->_batch = nullptr;
 }

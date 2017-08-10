@@ -19,14 +19,13 @@
 
 #include <QtGui/QWindow>
 
-#include <AnimationCache.h> // for Animation, AnimationCache, and AnimationPointer classes
+#include <shared/types/AnimationLoop.h> // for Animation, AnimationCache, and AnimationPointer classes
 #include <Octree.h> // for EncodeBitstreamParams class
 #include <OctreeElement.h> // for OctreeElement::AppendState
 #include <OctreePacketData.h>
 #include <PhysicsCollisionGroups.h>
 #include <ShapeInfo.h>
 #include <Transform.h>
-#include <Sound.h>
 #include <SpatiallyNestable.h>
 #include <Interpolate.h>
 
@@ -36,25 +35,21 @@
 #include "EntityTypes.h"
 #include "SimulationOwner.h"
 #include "SimulationFlags.h"
-#include "EntityActionInterface.h"
+#include "EntityDynamicInterface.h"
 
 class EntitySimulation;
 class EntityTreeElement;
 class EntityTreeElementExtraEncodeData;
-class EntityActionInterface;
+class EntityDynamicInterface;
 class EntityItemProperties;
 class EntityTree;
 class btCollisionShape;
 typedef std::shared_ptr<EntityTree> EntityTreePointer;
-typedef std::shared_ptr<EntityActionInterface> EntityActionPointer;
+typedef std::shared_ptr<EntityDynamicInterface> EntityDynamicPointer;
 typedef std::shared_ptr<EntityTreeElement> EntityTreeElementPointer;
 using EntityTreeElementExtraEncodeDataPointer = std::shared_ptr<EntityTreeElementExtraEncodeData>;
 
 
-namespace render {
-    class Scene;
-    class PendingChanges;
-}
 
 #define DONT_ALLOW_INSTANTIATION virtual void pureVirtualFunctionPlaceHolder() = 0;
 #define ALLOW_INSTANTIATION virtual void pureVirtualFunctionPlaceHolder() override { };
@@ -62,6 +57,10 @@ namespace render {
 #define debugTime(T, N) qPrintable(QString("%1 [ %2 ago]").arg(T, 16, 10).arg(formatUsecTime(N - T), 15))
 #define debugTimeOnly(T) qPrintable(QString("%1").arg(T, 16, 10))
 #define debugTreeVector(V) V << "[" << V << " in meters ]"
+
+class MeshProxyList;
+
+class RenderableEntityInterface;
 
 
 /// EntityItem class this is the base class for all entity types. It handles the basic properties and functionality available
@@ -80,6 +79,8 @@ public:
 
     EntityItem(const EntityItemID& entityItemID);
     virtual ~EntityItem();
+
+    virtual RenderableEntityInterface* getRenderableInterface() { return nullptr; }
 
     inline EntityItemPointer getThisPointer() const {
         return std::static_pointer_cast<EntityItem>(std::const_pointer_cast<SpatiallyNestable>(shared_from_this()));
@@ -108,24 +109,23 @@ public:
     virtual void somethingChangedNotification() { }
 
     void recordCreationTime();    // set _created to 'now'
-    quint64 getLastSimulated() const { return _lastSimulated; } /// Last simulated time of this entity universal usecs
-    void setLastSimulated(quint64 now) { _lastSimulated = now; }
+    quint64 getLastSimulated() const; /// Last simulated time of this entity universal usecs
+    void setLastSimulated(quint64 now);
 
      /// Last edited time of this entity universal usecs
-    quint64 getLastEdited() const { return _lastEdited; }
-    void setLastEdited(quint64 lastEdited)
-        { _lastEdited = _lastUpdated = lastEdited; _changedOnServer = glm::max(lastEdited, _changedOnServer); }
+    quint64 getLastEdited() const;
+    void setLastEdited(quint64 lastEdited);
     float getEditedAgo() const /// Elapsed seconds since this entity was last edited
         { return (float)(usecTimestampNow() - getLastEdited()) / (float)USECS_PER_SECOND; }
 
     /// Last time we sent out an edit packet for this entity
-    quint64 getLastBroadcast() const { return _lastBroadcast; }
-    void setLastBroadcast(quint64 lastBroadcast) { _lastBroadcast = lastBroadcast; }
+    quint64 getLastBroadcast() const;
+    void setLastBroadcast(quint64 lastBroadcast);
 
-    void markAsChangedOnServer() { _changedOnServer = usecTimestampNow();  }
-    quint64 getLastChangedOnServer() const { return _changedOnServer; }
+    void markAsChangedOnServer();
+    quint64 getLastChangedOnServer() const;
 
-    // TODO: eventually only include properties changed since the params.lastQuerySent time
+    // TODO: eventually only include properties changed since the params.nodeData->getLastTimeBagEmpty() time
     virtual EntityPropertyFlags getEntityProperties(EncodeBitstreamParams& params) const;
 
     virtual OctreeElement::AppendState appendEntityData(OctreePacketData* packetData, EncodeBitstreamParams& params,
@@ -149,20 +149,13 @@ public:
                                                 EntityPropertyFlags& propertyFlags, bool overwriteLocalData,
                                                 bool& somethingChanged)
                                                 { somethingChanged = false; return 0; }
-
-    virtual bool addToScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene,
-                            render::PendingChanges& pendingChanges) { return false; } // by default entity items don't add to scene
-    virtual void removeFromScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene,
-                                render::PendingChanges& pendingChanges) { } // by default entity items don't add to scene
-    virtual void render(RenderArgs* args) { } // by default entity items don't know how to render
-
     static int expectedBytes();
 
     static void adjustEditPacketForClockSkew(QByteArray& buffer, qint64 clockSkew);
 
     // perform update
-    virtual void update(const quint64& now) { _lastUpdated = now; }
-    quint64 getLastUpdated() const { return _lastUpdated; }
+    virtual void update(const quint64& now);
+    quint64 getLastUpdated() const;
 
     // perform linear extrapolation for SimpleEntitySimulation
     void simulate(const quint64& now);
@@ -186,63 +179,63 @@ public:
 
     const Transform getTransformToCenter(bool& success) const;
 
-    inline void requiresRecalcBoxes() { _recalcAABox = true; _recalcMinAACube = true; _recalcMaxAACube = true; }
+    void requiresRecalcBoxes();
 
     // Hyperlink related getters and setters
-    QString getHref() const { return _href; }
+    QString getHref() const;
     void setHref(QString value);
 
-    QString getDescription() const { return _description; }
-    void setDescription(QString value) { _description = value; }
+    QString getDescription() const;
+    void setDescription(const QString& value);
 
     /// Dimensions in meters (0.0 - TREE_SCALE)
     inline const glm::vec3 getDimensions() const { return getScale(); }
     virtual void setDimensions(const glm::vec3& value);
 
-    float getLocalRenderAlpha() const { return _localRenderAlpha; }
-    void setLocalRenderAlpha(float localRenderAlpha) { _localRenderAlpha = localRenderAlpha; }
+    float getLocalRenderAlpha() const;
+    void setLocalRenderAlpha(float localRenderAlpha);
 
     void setDensity(float density);
     float computeMass() const;
     void setMass(float mass);
 
-    float getDensity() const { return _density; }
+    float getDensity() const;
 
     bool hasVelocity() const { return getVelocity() != ENTITY_ITEM_ZERO_VEC3; }
     bool hasLocalVelocity() const { return getLocalVelocity() != ENTITY_ITEM_ZERO_VEC3; }
 
-    const glm::vec3& getGravity() const { return _gravity; } /// get gravity in meters
-    void setGravity(const glm::vec3& value) { _gravity = value; } /// gravity in meters
-    bool hasGravity() const { return _gravity != ENTITY_ITEM_ZERO_VEC3; }
+    glm::vec3 getGravity() const; /// get gravity in meters
+    void setGravity(const glm::vec3& value); /// gravity in meters
+    bool hasGravity() const { return getGravity() != ENTITY_ITEM_ZERO_VEC3; }
 
-    const glm::vec3& getAcceleration() const { return _acceleration; } /// get acceleration in meters/second/second
-    void setAcceleration(const glm::vec3& value) { _acceleration = value; } /// acceleration in meters/second/second
-    bool hasAcceleration() const { return _acceleration != ENTITY_ITEM_ZERO_VEC3; }
+    glm::vec3 getAcceleration() const; /// get acceleration in meters/second/second
+    void setAcceleration(const glm::vec3& value); /// acceleration in meters/second/second
+    bool hasAcceleration() const { return getAcceleration() != ENTITY_ITEM_ZERO_VEC3; }
 
-    float getDamping() const { return _damping; }
-    void setDamping(float value) { _damping = value; }
+    float getDamping() const;
+    void setDamping(float value);
 
-    float getRestitution() const { return _restitution; }
+    float getRestitution() const;
     void setRestitution(float value);
 
-    float getFriction() const { return _friction; }
+    float getFriction() const;
     void setFriction(float value);
 
     // lifetime related properties.
-    float getLifetime() const { return _lifetime; } /// get the lifetime in seconds for the entity
-    void setLifetime(float value) { _lifetime = value; } /// set the lifetime in seconds for the entity
+    float getLifetime() const; /// get the lifetime in seconds for the entity
+    void setLifetime(float value); /// set the lifetime in seconds for the entity
 
-    quint64 getCreated() const { return _created; } /// get the created-time in useconds for the entity
-    void setCreated(quint64 value) { _created = value; } /// set the created-time in useconds for the entity
+    quint64 getCreated() const; /// get the created-time in useconds for the entity
+    void setCreated(quint64 value); /// set the created-time in useconds for the entity
 
     /// is this entity immortal, in that it has no lifetime set, and will exist until manually deleted
-    bool isImmortal() const { return _lifetime == ENTITY_ITEM_IMMORTAL_LIFETIME; }
+    bool isImmortal() const { return getLifetime() == ENTITY_ITEM_IMMORTAL_LIFETIME; }
 
     /// is this entity mortal, in that it has a lifetime set, and will automatically be deleted when that lifetime expires
-    bool isMortal() const { return _lifetime != ENTITY_ITEM_IMMORTAL_LIFETIME; }
+    bool isMortal() const { return getLifetime() != ENTITY_ITEM_IMMORTAL_LIFETIME; }
 
     /// age of this entity in seconds
-    float getAge() const { return (float)(usecTimestampNow() - _created) / (float)USECS_PER_SECOND; }
+    float getAge() const { return (float)(usecTimestampNow() - getCreated()) / (float)USECS_PER_SECOND; }
     bool lifetimeHasExpired() const;
     quint64 getExpiry() const;
 
@@ -254,63 +247,59 @@ public:
     using SpatiallyNestable::getQueryAACube;
     virtual AACube getQueryAACube(bool& success) const override;
 
-    QString getScript() const { return _script; }
-    void setScript(const QString& value) { _script = value; }
+    QString getScript() const;
+    void setScript(const QString& value);
 
-    quint64 getScriptTimestamp() const { return _scriptTimestamp; }
-    void setScriptTimestamp(const quint64 value) { _scriptTimestamp = value; }
+    quint64 getScriptTimestamp() const;
+    void setScriptTimestamp(const quint64 value);
 
-    QString getServerScripts() const { return _serverScripts; }
-    void setServerScripts(const QString& serverScripts)
-        { _serverScripts = serverScripts; _serverScriptsChangedTimestamp = usecTimestampNow(); }
+    QString getServerScripts() const;
+    void setServerScripts(const QString& serverScripts);
 
-    const QString& getCollisionSoundURL() const { return _collisionSoundURL; }
+    QString getCollisionSoundURL() const;
     void setCollisionSoundURL(const QString& value);
 
-    SharedSoundPointer getCollisionSound();
-    void setCollisionSound(SharedSoundPointer sound) { _collisionSound = sound; }
-
-    const glm::vec3& getRegistrationPoint() const { return _registrationPoint; } /// registration point as ratio of entity
+    glm::vec3 getRegistrationPoint() const; /// registration point as ratio of entity
 
     /// registration point as ratio of entity
-    void setRegistrationPoint(const glm::vec3& value) {
-        _registrationPoint = glm::clamp(value, 0.0f, 1.0f); dimensionsChanged(); // Registration Point affects the bounding box
-    }
+    void setRegistrationPoint(const glm::vec3& value);
 
     bool hasAngularVelocity() const { return getAngularVelocity() != ENTITY_ITEM_ZERO_VEC3; }
     bool hasLocalAngularVelocity() const { return getLocalAngularVelocity() != ENTITY_ITEM_ZERO_VEC3; }
 
-    float getAngularDamping() const { return _angularDamping; }
-    void setAngularDamping(float value) { _angularDamping = value; }
+    float getAngularDamping() const;
+    void setAngularDamping(float value);
 
-    QString getName() const { return _name; }
-    void setName(const QString& value) { _name = value; }
-    QString getDebugName() { return _name != "" ? _name : getID().toString(); }
+    virtual QString getName() const override;
+    void setName(const QString& value);
+    QString getDebugName();
 
-    bool getVisible() const { return _visible; }
-    void setVisible(bool value) { _visible = value; }
-    bool isVisible() const { return _visible; }
-    bool isInvisible() const { return !_visible; }
+    bool getVisible() const;
+    void setVisible(bool value);
+    inline bool isVisible() const { return getVisible(); }
+    inline bool isInvisible() const { return !getVisible(); }
 
-    bool getCollisionless() const { return _collisionless; }
-    void setCollisionless(bool value) { _collisionless = value; }
+    bool getCollisionless() const;
+    void setCollisionless(bool value);
 
-    uint8_t getCollisionMask() const { return _collisionMask; }
-    void setCollisionMask(uint8_t value) { _collisionMask = value; }
+    uint8_t getCollisionMask() const;
+    void setCollisionMask(uint8_t value);
 
     void computeCollisionGroupAndFinalMask(int16_t& group, int16_t& mask) const;
 
-    bool getDynamic() const { return SHAPE_TYPE_STATIC_MESH == getShapeType() ? false : _dynamic; }
-    void setDynamic(bool value) { _dynamic = value; }
+    bool getDynamic() const;
+    void setDynamic(bool value);
 
     virtual bool shouldBePhysical() const { return false; }
 
-    bool getLocked() const { return _locked; }
-    void setLocked(bool value) { _locked = value; }
+    bool getLocked() const;
+    void setLocked(bool value);
+    void updateLocked(bool value);
 
-    const QString& getUserData() const { return _userData; }
-    virtual void setUserData(const QString& value) { _userData = value; }
+    QString getUserData() const;
+    virtual void setUserData(const QString& value);
 
+    // FIXME not thread safe?
     const SimulationOwner& getSimulationOwner() const { return _simulationOwner; }
     void setSimulationOwner(const QUuid& id, quint8 priority);
     void setSimulationOwner(const SimulationOwner& owner);
@@ -321,10 +310,14 @@ public:
     void updateSimulationOwner(const SimulationOwner& owner);
     void clearSimulationOwnership();
     void setPendingOwnershipPriority(quint8 priority, const quint64& timestamp);
+    uint8_t getPendingOwnershipPriority() const { return _simulationOwner.getPendingPriority(); }
     void rememberHasSimulationOwnershipBid() const;
 
-    const QString& getMarketplaceID() const { return _marketplaceID; }
-    void setMarketplaceID(const QString& value) { _marketplaceID = value; }
+    QString getMarketplaceID() const;
+    void setMarketplaceID(const QString& value);
+
+    bool getShouldHighlight() const;
+    void setShouldHighlight(const bool value);
 
     // TODO: get rid of users of getRadius()...
     float getRadius() const;
@@ -367,8 +360,9 @@ public:
     void updateCreated(uint64_t value);
     virtual void setShapeType(ShapeType type) { /* do nothing */ }
 
-    uint32_t getDirtyFlags() const { return _dirtyFlags; }
-    void clearDirtyFlags(uint32_t mask = 0xffffffff) { _dirtyFlags &= ~mask; }
+    uint32_t getDirtyFlags() const;
+    void markDirtyFlags(uint32_t mask);
+    void clearDirtyFlags(uint32_t mask = 0xffffffff);
 
     bool isMoving() const;
     bool isMovingRelativeToParent() const;
@@ -393,27 +387,26 @@ public:
 
     void getAllTerseUpdateProperties(EntityItemProperties& properties) const;
 
-    void pokeSimulationOwnership();
-    void grabSimulationOwnership();
+    void flagForOwnershipBid(uint8_t priority);
     void flagForMotionStateChange() { _dirtyFlags |= Simulation::DIRTY_MOTION_TYPE; }
 
     QString actionsToDebugString();
-    bool addAction(EntitySimulationPointer simulation, EntityActionPointer action);
+    bool addAction(EntitySimulationPointer simulation, EntityDynamicPointer action);
     bool updateAction(EntitySimulationPointer simulation, const QUuid& actionID, const QVariantMap& arguments);
     bool removeAction(EntitySimulationPointer simulation, const QUuid& actionID);
     bool clearActions(EntitySimulationPointer simulation);
-    void setActionData(QByteArray actionData);
-    const QByteArray getActionData() const;
+    void setDynamicData(QByteArray dynamicData);
+    const QByteArray getDynamicData() const;
     bool hasActions() const { return !_objectActions.empty(); }
     QList<QUuid> getActionIDs() const { return _objectActions.keys(); }
     QVariantMap getActionArguments(const QUuid& actionID) const;
     void deserializeActions();
 
-    void setActionDataDirty(bool value) const { _actionDataDirty = value; }
-    bool actionDataDirty() const { return _actionDataDirty; }
+    void setDynamicDataDirty(bool value) const { _dynamicDataDirty = value; }
+    bool dynamicDataDirty() const { return _dynamicDataDirty; }
 
-    void setActionDataNeedsTransmit(bool value) const { _actionDataNeedsTransmit = value; }
-    bool actionDataNeedsTransmit() const { return _actionDataNeedsTransmit; }
+    void setDynamicDataNeedsTransmit(bool value) const { _dynamicDataNeedsTransmit = value; }
+    bool dynamicDataNeedsTransmit() const { return _dynamicDataNeedsTransmit; }
 
     bool shouldSuppressLocationEdits() const;
 
@@ -421,7 +414,7 @@ public:
     const QUuid& getSourceUUID() const { return _sourceUUID; }
     bool matchesSourceUUID(const QUuid& sourceUUID) const { return _sourceUUID == sourceUUID; }
 
-    QList<EntityActionPointer> getActionsOfType(EntityActionType typeToGet) const;
+    QList<EntityDynamicPointer> getActionsOfType(EntityDynamicType typeToGet) const;
 
     // these are in the frame of this object
     virtual glm::quat getAbsoluteJointRotationInObjectFrame(int index) const override { return glm::quat(); }
@@ -470,17 +463,20 @@ public:
 
     QUuid getLastEditedBy() const { return _lastEditedBy; }
     void setLastEditedBy(QUuid value) { _lastEditedBy = value; }
-    
+
     bool matchesJSONFilters(const QJsonObject& jsonFilters) const;
+
+    virtual bool getMeshes(MeshProxyList& result) { return true; }
+
+    virtual void locationChanged(bool tellPhysics = true) override;
 
 protected:
 
     void setSimulated(bool simulated) { _simulated = simulated; }
 
-    const QByteArray getActionDataInternal() const;
-    void setActionDataInternal(QByteArray actionData);
+    const QByteArray getDynamicDataInternal() const;
+    void setDynamicDataInternal(QByteArray dynamicData);
 
-    virtual void locationChanged(bool tellPhysics = true) override;
     virtual void dimensionsChanged() override;
 
     EntityTypes::EntityType _type;
@@ -529,7 +525,6 @@ protected:
     quint64 _loadedScriptTimestamp { ENTITY_ITEM_DEFAULT_SCRIPT_TIMESTAMP + 1 };
 
     QString _collisionSoundURL;
-    SharedSoundPointer _collisionSound;
     glm::vec3 _registrationPoint;
     float _angularDamping;
     bool _visible;
@@ -540,6 +535,7 @@ protected:
     QString _userData;
     SimulationOwner _simulationOwner;
     QString _marketplaceID;
+    bool _shouldHighlight { false };
     QString _name;
     QString _href; //Hyperlink href
     QString _description; //Hyperlink description
@@ -568,22 +564,22 @@ protected:
     void* _physicsInfo { nullptr }; // set by EntitySimulation
     bool _simulated; // set by EntitySimulation
 
-    bool addActionInternal(EntitySimulationPointer simulation, EntityActionPointer action);
+    bool addActionInternal(EntitySimulationPointer simulation, EntityDynamicPointer action);
     bool removeActionInternal(const QUuid& actionID, EntitySimulationPointer simulation = nullptr);
     void deserializeActionsInternal();
     void serializeActions(bool& success, QByteArray& result) const;
-    QHash<QUuid, EntityActionPointer> _objectActions;
+    QHash<QUuid, EntityDynamicPointer> _objectActions;
 
     static int _maxActionsDataSize;
     mutable QByteArray _allActionsDataCache;
 
-    // when an entity-server starts up, EntityItem::setActionData is called before the entity-tree is
+    // when an entity-server starts up, EntityItem::setDynamicData is called before the entity-tree is
     // ready.  This means we can't find our EntityItemPointer or add the action to the simulation.  These
     // are used to keep track of and work around this situation.
     void checkWaitingToRemove(EntitySimulationPointer simulation = nullptr);
     mutable QSet<QUuid> _actionsToRemove;
-    mutable bool _actionDataDirty { false };
-    mutable bool _actionDataNeedsTransmit { false };
+    mutable bool _dynamicDataDirty { false };
+    mutable bool _dynamicDataNeedsTransmit { false };
     // _previouslyDeletedActions is used to avoid an action being re-added due to server round-trip lag
     static quint64 _rememberDeletedActionTime;
     mutable QHash<QUuid, quint64> _previouslyDeletedActions;

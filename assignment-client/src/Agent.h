@@ -23,14 +23,14 @@
 
 #include <EntityEditPacketSender.h>
 #include <EntityTree.h>
-#include <EntityTreeHeadlessViewer.h>
 #include <ScriptEngine.h>
 #include <ThreadedAssignment.h>
 
 #include <plugins/CodecPlugin.h>
 
-#include "AudioNoiseGate.h"
+#include "AudioGate.h"
 #include "MixedAudioStream.h"
+#include "entities/EntityTreeHeadlessViewer.h"
 #include "avatars/ScriptableAvatar.h"
 
 class Agent : public ThreadedAssignment {
@@ -45,9 +45,6 @@ class Agent : public ThreadedAssignment {
 
 public:
     Agent(ReceivedMessage& message);
-
-    void setIsAvatar(bool isAvatar);
-    bool isAvatar() const { return _isAvatar; }
 
     bool isPlayingAvatarSound() const { return _avatarSound != NULL; }
 
@@ -65,6 +62,9 @@ public:
 public slots:
     void run() override;
     void playAvatarSound(SharedSoundPointer avatarSound);
+    
+    void setIsAvatar(bool isAvatar);
+    bool isAvatar() const { return _isAvatar; }
 
 private slots:
     void requestScript();
@@ -81,9 +81,6 @@ private slots:
     void processAgentAvatar();
     void processAgentAvatarAudio();
 
-signals:
-    void startAvatarAudioTimer();
-    void stopAvatarAudioTimer();
 private:
     void negotiateAudioFormat();
     void selectAudioFormat(const QString& selectedCodecName);
@@ -111,13 +108,14 @@ private:
     QTimer* _avatarIdentityTimer = nullptr;
     QHash<QUuid, quint16> _outgoingScriptAudioSequenceNumbers;
 
-    AudioNoiseGate _noiseGate;
+    AudioGate _audioGate;
+    bool _audioGateOpen { true };
     bool _isNoiseGateEnabled { false };
 
     CodecPluginPointer _codec;
     QString _selectedCodecName;
     Encoder* _encoder { nullptr };
-    QThread _avatarAudioTimerThread;
+    QTimer _avatarAudioTimer;
     bool _flushEncoder { false };
 };
 

@@ -87,8 +87,8 @@ function moveCloserToCamera(positionAtHUD) {
     // we don't actually want to render at the slerped look at... instead, we want to render
     // slightly closer to the camera than that.
     var MOVE_CLOSER_TO_CAMERA_BY = -0.25;
-    var cameraFront = Quat.getFront(Camera.orientation);
-    var closerToCamera = Vec3.multiply(cameraFront, MOVE_CLOSER_TO_CAMERA_BY); // slightly closer to camera
+    var cameraForward = Quat.getForward(Camera.orientation);
+    var closerToCamera = Vec3.multiply(cameraForward, MOVE_CLOSER_TO_CAMERA_BY); // slightly closer to camera
     var slightlyCloserPosition = Vec3.sum(positionAtHUD, closerToCamera);
 
     return slightlyCloserPosition;
@@ -196,9 +196,9 @@ MyAvatar.wentActive.connect(setActiveProperties)
 
 function setAwayProperties() {
     isAway = true;
-    wasMuted = AudioDevice.getMuted();
+    wasMuted = Audio.muted;
     if (!wasMuted) {
-        AudioDevice.toggleMute();
+        Audio.muted = !Audio.muted;
     }
     MyAvatar.setEnableMeshVisible(false);  // just for our own display, without changing point of view
     playAwayAnimation(); // animation is still seen by others
@@ -221,7 +221,7 @@ function setAwayProperties() {
 function setActiveProperties() {
     isAway = false;
     if (!wasMuted) {
-        AudioDevice.toggleMute();
+        Audio.muted = !Audio.muted;
     }
     MyAvatar.setEnableMeshVisible(true); // IWBNI we respected Developer->Avatar->Draw Mesh setting.
     stopAwayAnimation();

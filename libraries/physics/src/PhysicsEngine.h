@@ -1,6 +1,6 @@
 //
 //  PhysicsEngine.h
-//  libraries/physcis/src
+//  libraries/physics/src
 //
 //  Created by Andrew Meadows 2014.10.29
 //  Copyright 2014 High Fidelity, Inc.
@@ -13,6 +13,7 @@
 #define hifi_PhysicsEngine_h
 
 #include <stdint.h>
+#include <set>
 #include <vector>
 
 #include <QUuid>
@@ -24,6 +25,7 @@
 #include "ObjectMotionState.h"
 #include "ThreadSafeDynamicsWorld.h"
 #include "ObjectAction.h"
+#include "ObjectConstraint.h"
 
 const float HALF_SIMULATION_EXTENT = 512.0f; // meters
 
@@ -40,8 +42,8 @@ public:
     void* _b; // ObjectMotionState pointer
 };
 
-typedef std::map<ContactKey, ContactInfo> ContactMap;
-typedef std::vector<Collision> CollisionEvents;
+using ContactMap = std::map<ContactKey, ContactInfo>;
+using CollisionEvents = std::vector<Collision>;
 
 class PhysicsEngine {
 public:
@@ -52,7 +54,7 @@ public:
     uint32_t getNumSubsteps();
 
     void removeObjects(const VectorOfMotionStates& objects);
-    void removeObjects(const SetOfMotionStates& objects); // only called during teardown
+    void removeSetOfObjects(const SetOfMotionStates& objects); // only called during teardown
 
     void addObjects(const VectorOfMotionStates& objects);
     VectorOfMotionStates changeObjects(const VectorOfMotionStates& objects);
@@ -84,12 +86,13 @@ public:
 
     void dumpNextStats() { _dumpNextStats = true; }
 
-    EntityActionPointer getActionByID(const QUuid& actionID) const;
-    void addAction(EntityActionPointer action);
-    void removeAction(const QUuid actionID);
-    void forEachAction(std::function<void(EntityActionPointer)> actor);
+    EntityDynamicPointer getDynamicByID(const QUuid& dynamicID) const;
+    bool addDynamic(EntityDynamicPointer dynamic);
+    void removeDynamic(const QUuid dynamicID);
+    void forEachDynamic(std::function<void(EntityDynamicPointer)> actor);
 
 private:
+    QList<EntityDynamicPointer> removeDynamicsForBody(btRigidBody* body);
     void addObjectToDynamicsWorld(ObjectMotionState* motionState);
     void recursivelyHarvestPerformanceStats(CProfileIterator* profileIterator, QString contextName);
 
@@ -110,8 +113,9 @@ private:
 
     ContactMap _contactMap;
     CollisionEvents _collisionEvents;
-    QHash<QUuid, EntityActionPointer> _objectActions;
-    std::vector<btRigidBody*> _activeStaticBodies;
+    QHash<QUuid, EntityDynamicPointer> _objectDynamics;
+    QHash<btRigidBody*, QSet<QUuid>> _objectDynamicsByBody;
+    std::set<btRigidBody*> _activeStaticBodies;
 
     glm::vec3 _originOffset;
 
@@ -122,6 +126,7 @@ private:
 
     bool _dumpNextStats = false;
     bool _hasOutgoingChanges = false;
+
 };
 
 typedef std::shared_ptr<PhysicsEngine> PhysicsEnginePointer;

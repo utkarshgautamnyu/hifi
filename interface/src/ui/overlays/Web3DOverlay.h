@@ -31,6 +31,7 @@ public:
 
     QString pickURL();
     void loadSourceURL();
+    void setMaxFPS(uint8_t maxFPS);
     virtual void render(RenderArgs* args) override;
     virtual const render::ShapeKey getShapeKey() override;
 
@@ -39,6 +40,8 @@ public:
     QObject* getEventHandler();
     void setProxyWindow(QWindow* proxyWindow);
     void handlePointerEvent(const PointerEvent& event);
+    void handlePointerEventAsTouch(const PointerEvent& event);
+    void handlePointerEventAsMouse(const PointerEvent& event);
 
     // setters
     void setURL(const QString& url);
@@ -47,12 +50,17 @@ public:
     void setProperties(const QVariantMap& properties) override;
     QVariant getProperty(const QString& property) override;
 
-    glm::vec2 getSize();
+    glm::vec2 getSize() const override;
 
     virtual bool findRayIntersection(const glm::vec3& origin, const glm::vec3& direction, float& distance,
         BoxFace& face, glm::vec3& surfaceNormal) override;
 
     virtual Web3DOverlay* createClone() const override;
+
+    enum InputMode {
+        Touch,
+        Mouse
+    };
 
 public slots:
     void emitScriptEvent(const QVariant& scriptMessage);
@@ -62,8 +70,8 @@ signals:
     void webEventReceived(const QVariant& message);
 
 private:
+    InputMode _inputMode { Touch };
     QSharedPointer<OffscreenQmlSurface> _webSurface;
-    QMetaObject::Connection _connection;
     gpu::TexturePointer _texture;
     QString _url;
     QString _scriptURL;
@@ -73,15 +81,14 @@ private:
     bool _showKeyboardFocusHighlight{ true };
 
     bool _pressed{ false };
+    bool _touchBeginAccepted { false };
+    std::map<uint32_t, QTouchEvent::TouchPoint> _activeTouchPoints;
     QTouchDevice _touchDevice;
 
-    QMetaObject::Connection _mousePressConnection;
-    QMetaObject::Connection _mouseReleaseConnection;
-    QMetaObject::Connection _mouseMoveConnection;
-    QMetaObject::Connection _hoverLeaveConnection;
+    uint8_t _desiredMaxFPS { 10 };
+    uint8_t _currentMaxFPS { 0 };
 
-    QMetaObject::Connection _emitScriptEventConnection;
-    QMetaObject::Connection _webEventReceivedConnection;
+    bool _mayNeedResize { false };
 };
 
 #endif // hifi_Web3DOverlay_h

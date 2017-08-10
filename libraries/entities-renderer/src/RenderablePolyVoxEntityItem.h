@@ -12,20 +12,35 @@
 #ifndef hifi_RenderablePolyVoxEntityItem_h
 #define hifi_RenderablePolyVoxEntityItem_h
 
-#include <QSemaphore>
 #include <atomic>
+
+#include <QSemaphore>
 
 #include <PolyVoxCore/SimpleVolume.h>
 #include <PolyVoxCore/Raycast.h>
 
+#include <gpu/Context.h>
+#include <model/Forward.h>
 #include <TextureCache.h>
+#include <PolyVoxEntityItem.h>
 
-#include "PolyVoxEntityItem.h"
 #include "RenderableEntityItem.h"
-#include "gpu/Context.h"
 
 class PolyVoxPayload {
 public:
+
+    static uint8_t CUSTOM_PIPELINE_NUMBER;
+    static render::ShapePipelinePointer shapePipelineFactory(const render::ShapePlumber& plumber, const render::ShapeKey& key);
+    static void registerShapePipeline() {
+        if (!CUSTOM_PIPELINE_NUMBER) {
+            CUSTOM_PIPELINE_NUMBER = render::ShapePipeline::registerCustomShapePipelineFactory(shapePipelineFactory);
+        }
+    }
+    
+    static const int MATERIAL_GPU_SLOT = 3;
+    static std::shared_ptr<gpu::Pipeline> _pipeline;
+    static std::shared_ptr<gpu::Pipeline> _wireframePipeline;
+
     PolyVoxPayload(EntityItemPointer owner) : _owner(owner), _bounds(AABox()) { }
     typedef render::Payload<PolyVoxPayload> Payload;
     typedef Payload::DataPointer Pointer;
@@ -38,15 +53,18 @@ namespace render {
    template <> const ItemKey payloadGetKey(const PolyVoxPayload::Pointer& payload);
    template <> const Item::Bound payloadGetBound(const PolyVoxPayload::Pointer& payload);
    template <> void payloadRender(const PolyVoxPayload::Pointer& payload, RenderArgs* args);
+   template <> const ShapeKey shapeGetShapeKey(const PolyVoxPayload::Pointer& payload);
 }
 
 
-class RenderablePolyVoxEntityItem : public PolyVoxEntityItem {
+class RenderablePolyVoxEntityItem : public PolyVoxEntityItem, public RenderableEntityInterface {
 public:
     static EntityItemPointer factory(const EntityItemID& entityID, const EntityItemProperties& properties);
     RenderablePolyVoxEntityItem(const EntityItemID& entityItemID);
 
     virtual ~RenderablePolyVoxEntityItem();
+
+    RenderableEntityInterface* getRenderableInterface() override { return this; }
 
     void initializePolyVox();
 
@@ -66,7 +84,7 @@ public:
     void render(RenderArgs* args) override;
     virtual bool supportsDetailedRayIntersection() const override { return true; }
     virtual bool findDetailedRayIntersection(const glm::vec3& origin, const glm::vec3& direction,
-                        bool& keepSearching, OctreeElementPointer& element, float& distance, 
+                        bool& keepSearching, OctreeElementPointer& element, float& distance,
                         BoxFace& face, glm::vec3& surfaceNormal,
                         void** intersectedObject, bool precisionPicking) const override;
 
@@ -101,16 +119,16 @@ public:
     virtual bool setAll(uint8_t toValue) override;
     virtual bool setCuboid(const glm::vec3& lowPosition, const glm::vec3& cuboidSize, int toValue) override;
 
-    virtual void setXTextureURL(QString xTextureURL) override;
-    virtual void setYTextureURL(QString yTextureURL) override;
-    virtual void setZTextureURL(QString zTextureURL) override;
+    virtual void setXTextureURL(const QString& xTextureURL) override;
+    virtual void setYTextureURL(const QString& yTextureURL) override;
+    virtual void setZTextureURL(const QString& zTextureURL) override;
 
-    virtual bool addToScene(EntityItemPointer self,
-                            std::shared_ptr<render::Scene> scene,
-                            render::PendingChanges& pendingChanges) override;
-    virtual void removeFromScene(EntityItemPointer self,
-                                 std::shared_ptr<render::Scene> scene,
-                                 render::PendingChanges& pendingChanges) override;
+    virtual bool addToScene(const EntityItemPointer& self,
+                            const render::ScenePointer& scene,
+                            render::Transaction& transaction) override;
+    virtual void removeFromScene(const EntityItemPointer& self,
+                                 const render::ScenePointer& scene,
+                                 render::Transaction& transaction) override;
 
     virtual void setXNNeighborID(const EntityItemID& xNNeighborID) override;
     virtual void setYNNeighborID(const EntityItemID& yNNeighborID) override;
@@ -135,17 +153,18 @@ public:
     QByteArray volDataToArray(quint16 voxelXSize, quint16 voxelYSize, quint16 voxelZSize) const;
 
     void setMesh(model::MeshPointer mesh);
-    bool getMeshAsScriptValue(QScriptEngine *engine, QScriptValue& result) override;
     void setCollisionPoints(ShapeInfo::PointCollection points, AABox box);
     PolyVox::SimpleVolume<uint8_t>* getVolData() { return _volData; }
 
     uint8_t getVoxelInternal(int x, int y, int z) const;
     bool setVoxelInternal(int x, int y, int z, uint8_t toValue);
 
-    void setVolDataDirty() { withWriteLock([&] { _volDataDirty = true; }); }
+    void setVolDataDirty() { withWriteLock([&] { _volDataDirty = true; _meshReady = false; }); }
 
     // Transparent polyvox didn't seem to be working so disable for now
     bool isTransparent() override { return false; }
+
+    bool getMeshes(MeshProxyList& result) override;
 
 protected:
     virtual void locationChanged(bool tellPhysics = true) override;
@@ -157,16 +176,13 @@ private:
     model::MeshPointer _mesh;
     gpu::Stream::FormatPointer _vertexFormat;
     bool _meshDirty { true }; // does collision-shape need to be recomputed?
-    bool _meshInitialized { false };
+    bool _meshReady { false };
 
     NetworkTexturePointer _xTexture;
     NetworkTexturePointer _yTexture;
     NetworkTexturePointer _zTexture;
 
-    const int MATERIAL_GPU_SLOT = 3;
     render::ItemID _myItem{ render::Item::INVALID_ITEM_ID };
-    static gpu::PipelinePointer _pipeline;
-    static gpu::PipelinePointer _wireframePipeline;
 
     ShapeInfo _shapeInfo;
 

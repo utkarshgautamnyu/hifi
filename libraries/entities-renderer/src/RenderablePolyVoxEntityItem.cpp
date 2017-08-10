@@ -9,11 +9,15 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 
+
+#include "RenderablePolyVoxEntityItem.h"
+
 #include <math.h>
 #include <QObject>
 #include <QByteArray>
 #include <QtConcurrent/QtConcurrentRun>
 #include <glm/gtx/transform.hpp>
+#include <model-networking/SimpleMeshProxy.h>
 #include "ModelScriptingInterface.h"
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -46,18 +50,16 @@
 #endif
 
 #include "model/Geometry.h"
+
+#include "StencilMaskPass.h"
+
 #include "EntityTreeRenderer.h"
 #include "polyvox_vert.h"
 #include "polyvox_frag.h"
-#include "RenderablePolyVoxEntityItem.h"
 #include "EntityEditPacketSender.h"
 #include "PhysicalEntitySimulation.h"
 
-gpu::PipelinePointer RenderablePolyVoxEntityItem::_pipeline = nullptr;
-gpu::PipelinePointer RenderablePolyVoxEntityItem::_wireframePipeline = nullptr;
-
 const float MARCHING_CUBE_COLLISION_HULL_OFFSET = 0.5;
-
 
 /*
   A PolyVoxEntity has several interdependent parts:
@@ -110,6 +112,10 @@ EntityItemPointer RenderablePolyVoxEntityItem::factory(const EntityItemID& entit
     EntityItemPointer entity{ new RenderablePolyVoxEntityItem(entityID) };
     entity->setProperties(properties);
     std::static_pointer_cast<RenderablePolyVoxEntityItem>(entity)->initializePolyVox();
+
+    // As we create the first Polyvox entity, let's register its special shapePipeline factory:
+    PolyVoxPayload::registerShapePipeline();
+
     return entity;
 }
 
@@ -404,6 +410,9 @@ bool RenderablePolyVoxEntityItem::setSphere(glm::vec3 centerWorldCoords, float r
     float smallestDimensionSize = voxelSize.x;
     smallestDimensionSize = glm::min(smallestDimensionSize, voxelSize.y);
     smallestDimensionSize = glm::min(smallestDimensionSize, voxelSize.z);
+    if (smallestDimensionSize <= 0.0f) {
+        return false;
+    }
 
     glm::vec3 maxRadiusInVoxelCoords = glm::vec3(radiusWorldCoords / smallestDimensionSize);
     glm::vec3 centerInVoxelCoords = wtvMatrix * glm::vec4(centerWorldCoords, 1.0f);
@@ -414,21 +423,33 @@ bool RenderablePolyVoxEntityItem::setSphere(glm::vec3 centerWorldCoords, float r
     glm::ivec3 lowI = glm::clamp(low, glm::vec3(0.0f), _voxelVolumeSize);
     glm::ivec3 highI = glm::clamp(high, glm::vec3(0.0f), _voxelVolumeSize);
 
+    glm::vec3 radials(radiusWorldCoords / voxelSize.x,
+                      radiusWorldCoords / voxelSize.y,
+                      radiusWorldCoords / voxelSize.z);
+
     // This three-level for loop iterates over every voxel in the volume that might be in the sphere
     withWriteLock([&] {
         for (int z = lowI.z; z < highI.z; z++) {
             for (int y = lowI.y; y < highI.y; y++) {
                 for (int x = lowI.x; x < highI.x; x++) {
-                    // Store our current position as a vector...
-                    glm::vec4 pos(x + 0.5f, y + 0.5f, z + 0.5f, 1.0); // consider voxels cenetered on their coordinates
-                    // convert to world coordinates
-                    glm::vec3 worldPos = glm::vec3(vtwMatrix * pos);
-                    // compute how far the current position is from the center of the volume
-                    float fDistToCenter = glm::distance(worldPos, centerWorldCoords);
-                    // If the current voxel is less than 'radius' units from the center then we set its value
-                    if (fDistToCenter <= radiusWorldCoords) {
+
+                    // set voxels whose bounding-box touches the sphere
+                    AABox voxelBox(glm::vec3(x - 0.5f, y - 0.5f, z - 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));
+                    if (voxelBox.touchesAAEllipsoid(centerInVoxelCoords, radials)) {
                         result |= setVoxelInternal(x, y, z, toValue);
                     }
+
+                    // TODO -- this version only sets voxels which have centers inside the sphere.  which is best?
+                    // // Store our current position as a vector...
+                    // glm::vec4 pos(x + 0.5f, y + 0.5f, z + 0.5f, 1.0); // consider voxels cenetered on their coordinates
+                    // // convert to world coordinates
+                    // glm::vec3 worldPos = glm::vec3(vtwMatrix * pos);
+                    // // compute how far the current position is from the center of the volume
+                    // float fDistToCenter = glm::distance(worldPos, centerWorldCoords);
+                    // // If the current voxel is less than 'radius' units from the center then we set its value
+                    // if (fDistToCenter <= radiusWorldCoords) {
+                    //     result |= setVoxelInternal(x, y, z, toValue);
+                    // }
                 }
             }
         }
@@ -645,22 +666,22 @@ void RenderablePolyVoxEntityItem::computeShapeInfo(ShapeInfo& info) {
     });
 }
 
-void RenderablePolyVoxEntityItem::setXTextureURL(QString xTextureURL) {
-    if (xTextureURL != _xTextureURL) {
+void RenderablePolyVoxEntityItem::setXTextureURL(const QString& xTextureURL) {
+    if (xTextureURL != getXTextureURL()) {
         _xTexture.clear();
         PolyVoxEntityItem::setXTextureURL(xTextureURL);
     }
 }
 
-void RenderablePolyVoxEntityItem::setYTextureURL(QString yTextureURL) {
-    if (yTextureURL != _yTextureURL) {
+void RenderablePolyVoxEntityItem::setYTextureURL(const QString& yTextureURL) {
+    if (yTextureURL != getYTextureURL()) {
         _yTexture.clear();
         PolyVoxEntityItem::setYTextureURL(yTextureURL);
     }
 }
 
-void RenderablePolyVoxEntityItem::setZTextureURL(QString zTextureURL) {
-    if (zTextureURL != _zTextureURL) {
+void RenderablePolyVoxEntityItem::setZTextureURL(const QString& zTextureURL) {
+    if (zTextureURL != getZTextureURL()) {
         _zTexture.clear();
         PolyVoxEntityItem::setZTextureURL(zTextureURL);
     }
@@ -677,6 +698,8 @@ bool RenderablePolyVoxEntityItem::updateDependents() {
             _voxelDataDirty = false;
         } else if (_volDataDirty) {
             _volDataDirty = false;
+        } else {
+            _meshReady = true;
         }
     });
     if (voxelDataDirty) {
@@ -694,7 +717,9 @@ void RenderablePolyVoxEntityItem::render(RenderArgs* args) {
     assert(getType() == EntityTypes::PolyVox);
     Q_ASSERT(args->_batch);
 
-    updateDependents();
+    if (_voxelDataDirty || _volDataDirty) {
+        updateDependents();
+    }
 
     model::MeshPointer mesh;
     glm::vec3 voxelVolumeSize;
@@ -707,33 +732,6 @@ void RenderablePolyVoxEntityItem::render(RenderArgs* args) {
         !mesh->getIndexBuffer()._buffer) {
         return;
     }
-    
-    if (!_pipeline) {
-        gpu::ShaderPointer vertexShader = gpu::Shader::createVertex(std::string(polyvox_vert));
-        gpu::ShaderPointer pixelShader = gpu::Shader::createPixel(std::string(polyvox_frag));
-
-        gpu::Shader::BindingSet slotBindings;
-        slotBindings.insert(gpu::Shader::Binding(std::string("materialBuffer"), MATERIAL_GPU_SLOT));
-        slotBindings.insert(gpu::Shader::Binding(std::string("xMap"), 0));
-        slotBindings.insert(gpu::Shader::Binding(std::string("yMap"), 1));
-        slotBindings.insert(gpu::Shader::Binding(std::string("zMap"), 2));
-
-        gpu::ShaderPointer program = gpu::Shader::createProgram(vertexShader, pixelShader);
-        gpu::Shader::makeProgram(*program, slotBindings);
-
-        auto state = std::make_shared<gpu::State>();
-        state->setCullMode(gpu::State::CULL_BACK);
-        state->setDepthTest(true, true, gpu::LESS_EQUAL);
-
-        _pipeline = gpu::Pipeline::create(program, state);
-
-        auto wireframeState = std::make_shared<gpu::State>();
-        wireframeState->setCullMode(gpu::State::CULL_BACK);
-        wireframeState->setDepthTest(true, true, gpu::LESS_EQUAL);
-        wireframeState->setFillMode(gpu::State::FILL_LINE);
-
-        _wireframePipeline = gpu::Pipeline::create(program, wireframeState);
-    }
 
     if (!_vertexFormat) {
         auto vf = std::make_shared<gpu::Stream::Format>();
@@ -744,17 +742,18 @@ void RenderablePolyVoxEntityItem::render(RenderArgs* args) {
 
     gpu::Batch& batch = *args->_batch;
 
-    // Pick correct Pipeline
-    bool wireframe = (render::ShapeKey(args->_globalShapeKey).isWireframe());
-    auto pipeline = (wireframe ? _wireframePipeline : _pipeline);
-    batch.setPipeline(pipeline);
-
     Transform transform(voxelToWorldMatrix());
     batch.setModelTransform(transform);
     batch.setInputFormat(_vertexFormat);
     batch.setInputBuffer(gpu::Stream::POSITION, mesh->getVertexBuffer()._buffer,
                          0,
                          sizeof(PolyVox::PositionMaterialNormal));
+
+    // TODO -- should we be setting this?
+    // batch.setInputBuffer(gpu::Stream::NORMAL, mesh->getVertexBuffer()._buffer,
+    //                      12,
+    //                      sizeof(PolyVox::PositionMaterialNormal));
+
 
     batch.setIndexBuffer(gpu::UINT32, mesh->getIndexBuffer()._buffer, 0);
 
@@ -784,15 +783,15 @@ void RenderablePolyVoxEntityItem::render(RenderArgs* args) {
         batch.setResourceTexture(2, DependencyManager::get<TextureCache>()->getWhiteTexture());
     }
 
-    int voxelVolumeSizeLocation = pipeline->getProgram()->getUniforms().findLocation("voxelVolumeSize");
+    int voxelVolumeSizeLocation = args->_shapePipeline->pipeline->getProgram()->getUniforms().findLocation("voxelVolumeSize");
     batch._glUniform3f(voxelVolumeSizeLocation, voxelVolumeSize.x, voxelVolumeSize.y, voxelVolumeSize.z);
 
     batch.drawIndexed(gpu::TRIANGLES, (gpu::uint32)mesh->getNumIndices(), 0);
 }
 
-bool RenderablePolyVoxEntityItem::addToScene(EntityItemPointer self,
-                                             std::shared_ptr<render::Scene> scene,
-                                             render::PendingChanges& pendingChanges) {
+bool RenderablePolyVoxEntityItem::addToScene(const EntityItemPointer& self,
+                                             const render::ScenePointer& scene,
+                                             render::Transaction& transaction) {
     _myItem = scene->allocateID();
 
     auto renderItem = std::make_shared<PolyVoxPayload>(getThisPointer());
@@ -803,16 +802,58 @@ bool RenderablePolyVoxEntityItem::addToScene(EntityItemPointer self,
     makeEntityItemStatusGetters(getThisPointer(), statusGetters);
     renderPayload->addStatusGetters(statusGetters);
 
-    pendingChanges.resetItem(_myItem, renderPayload);
+    transaction.resetItem(_myItem, renderPayload);
 
     return true;
 }
 
-void RenderablePolyVoxEntityItem::removeFromScene(EntityItemPointer self,
-                                                  std::shared_ptr<render::Scene> scene,
-                                                  render::PendingChanges& pendingChanges) {
-    pendingChanges.removeItem(_myItem);
+void RenderablePolyVoxEntityItem::removeFromScene(const EntityItemPointer& self,
+                                                  const render::ScenePointer& scene,
+                                                  render::Transaction& transaction) {
+    transaction.removeItem(_myItem);
     render::Item::clearID(_myItem);
+}
+
+uint8_t PolyVoxPayload::CUSTOM_PIPELINE_NUMBER = 0;
+
+std::shared_ptr<gpu::Pipeline> PolyVoxPayload::_pipeline;
+std::shared_ptr<gpu::Pipeline> PolyVoxPayload::_wireframePipeline;
+
+render::ShapePipelinePointer PolyVoxPayload::shapePipelineFactory(const render::ShapePlumber& plumber, const render::ShapeKey& key) {
+   if (!_pipeline) {
+        gpu::ShaderPointer vertexShader = gpu::Shader::createVertex(std::string(polyvox_vert));
+        gpu::ShaderPointer pixelShader = gpu::Shader::createPixel(std::string(polyvox_frag));
+
+        gpu::Shader::BindingSet slotBindings;
+        slotBindings.insert(gpu::Shader::Binding(std::string("materialBuffer"), PolyVoxPayload::MATERIAL_GPU_SLOT));
+        slotBindings.insert(gpu::Shader::Binding(std::string("xMap"), 0));
+        slotBindings.insert(gpu::Shader::Binding(std::string("yMap"), 1));
+        slotBindings.insert(gpu::Shader::Binding(std::string("zMap"), 2));
+
+        gpu::ShaderPointer program = gpu::Shader::createProgram(vertexShader, pixelShader);
+        gpu::Shader::makeProgram(*program, slotBindings);
+
+        auto state = std::make_shared<gpu::State>();
+        state->setCullMode(gpu::State::CULL_BACK);
+        state->setDepthTest(true, true, gpu::LESS_EQUAL);
+        PrepareStencil::testMaskDrawShape(*state);
+
+        _pipeline = gpu::Pipeline::create(program, state);
+
+        auto wireframeState = std::make_shared<gpu::State>();
+        wireframeState->setCullMode(gpu::State::CULL_BACK);
+        wireframeState->setDepthTest(true, true, gpu::LESS_EQUAL);
+        wireframeState->setFillMode(gpu::State::FILL_LINE);
+        PrepareStencil::testMaskDrawShape(*wireframeState);
+
+        _wireframePipeline = gpu::Pipeline::create(program, wireframeState);
+    }
+
+    if (key.isWireframe()) {    
+        return std::make_shared<render::ShapePipeline>(_wireframePipeline, nullptr, nullptr, nullptr);
+    } else {
+        return std::make_shared<render::ShapePipeline>(_pipeline, nullptr, nullptr, nullptr);
+    }
 }
 
 namespace render {
@@ -835,9 +876,13 @@ namespace render {
 
     template <> void payloadRender(const PolyVoxPayload::Pointer& payload, RenderArgs* args) {
         if (args && payload && payload->_owner) {
-            payload->_owner->render(args);
+            payload->_owner->getRenderableInterface()->render(args);
         }
     }
+
+   template <> const ShapeKey shapeGetShapeKey(const PolyVoxPayload::Pointer& payload) {
+        return ShapeKey::Builder().withCustom(PolyVoxPayload::CUSTOM_PIPELINE_NUMBER).build();
+   }
 }
 
 
@@ -1274,23 +1319,27 @@ void RenderablePolyVoxEntityItem::recomputeMesh() {
         auto indexBuffer = std::make_shared<gpu::Buffer>(vecIndices.size() * sizeof(uint32_t),
                                                          (gpu::Byte*)vecIndices.data());
         auto indexBufferPtr = gpu::BufferPointer(indexBuffer);
-        gpu::BufferView indexBufferView(indexBufferPtr, gpu::Element(gpu::SCALAR, gpu::UINT32, gpu::RAW));
+        gpu::BufferView indexBufferView(indexBufferPtr, gpu::Element(gpu::SCALAR, gpu::UINT32, gpu::INDEX));
         mesh->setIndexBuffer(indexBufferView);
 
-        const std::vector<PolyVox::PositionMaterialNormal>& vecVertices = polyVoxMesh.getVertices();
+        const std::vector<PolyVox::PositionMaterialNormal>& vecVertices = polyVoxMesh.getRawVertexData();
         auto vertexBuffer = std::make_shared<gpu::Buffer>(vecVertices.size() * sizeof(PolyVox::PositionMaterialNormal),
                                                           (gpu::Byte*)vecVertices.data());
         auto vertexBufferPtr = gpu::BufferPointer(vertexBuffer);
         gpu::BufferView vertexBufferView(vertexBufferPtr, 0,
                                          vertexBufferPtr->getSize(),
                                          sizeof(PolyVox::PositionMaterialNormal),
-                                         gpu::Element(gpu::VEC3, gpu::FLOAT, gpu::RAW));
+                                         gpu::Element(gpu::VEC3, gpu::FLOAT, gpu::XYZ));
         mesh->setVertexBuffer(vertexBufferView);
+
+
+        // TODO -- use 3-byte normals rather than 3-float normals
         mesh->addAttribute(gpu::Stream::NORMAL,
-                           gpu::BufferView(vertexBufferPtr, sizeof(float) * 3,
-                                           vertexBufferPtr->getSize() ,
+                           gpu::BufferView(vertexBufferPtr,
+                                           sizeof(float) * 3, // polyvox mesh is packed: position, normal, material
+                                           vertexBufferPtr->getSize(),
                                            sizeof(PolyVox::PositionMaterialNormal),
-                                           gpu::Element(gpu::VEC3, gpu::FLOAT, gpu::RAW)));
+                                           gpu::Element(gpu::VEC3, gpu::FLOAT, gpu::XYZ)));
 
         std::vector<model::Mesh::Part> parts;
         parts.emplace_back(model::Mesh::Part((model::Index)0, // startIndex
@@ -1312,7 +1361,7 @@ void RenderablePolyVoxEntityItem::setMesh(model::MeshPointer mesh) {
         }
         _mesh = mesh;
         _meshDirty = true;
-        _meshInitialized = true;
+        _meshReady = true;
         neighborsNeedUpdate = _neighborsNeedUpdate;
         _neighborsNeedUpdate = false;
     });
@@ -1324,7 +1373,7 @@ void RenderablePolyVoxEntityItem::setMesh(model::MeshPointer mesh) {
 void RenderablePolyVoxEntityItem::computeShapeInfoWorker() {
     // this creates a collision-shape for the physics engine.  The shape comes from
     // _volData for cubic extractors and from _mesh for marching-cube extractors
-    if (!_meshInitialized) {
+    if (!_meshReady) {
         return;
     }
 
@@ -1582,17 +1631,18 @@ void RenderablePolyVoxEntityItem::bonkNeighbors() {
 
 void RenderablePolyVoxEntityItem::locationChanged(bool tellPhysics) {
     EntityItem::locationChanged(tellPhysics);
-    if (!_pipeline || !render::Item::isValidID(_myItem)) {
+    if (!render::Item::isValidID(_myItem)) {
         return;
     }
     render::ScenePointer scene = AbstractViewStateInterface::instance()->getMain3DScene();
-    render::PendingChanges pendingChanges;
-    pendingChanges.updateItem<PolyVoxPayload>(_myItem, [](PolyVoxPayload& payload) {});
+    render::Transaction transaction;
+    transaction.updateItem<PolyVoxPayload>(_myItem, [](PolyVoxPayload& payload) {});
 
-    scene->enqueuePendingChanges(pendingChanges);
+    scene->enqueueTransaction(transaction);
 }
 
-bool RenderablePolyVoxEntityItem::getMeshAsScriptValue(QScriptEngine *engine, QScriptValue& result) {
+
+bool RenderablePolyVoxEntityItem::getMeshes(MeshProxyList& result) {
     if (!updateDependents()) {
         return false;
     }
@@ -1601,15 +1651,23 @@ bool RenderablePolyVoxEntityItem::getMeshAsScriptValue(QScriptEngine *engine, QS
     MeshProxy* meshProxy = nullptr;
     glm::mat4 transform = voxelToLocalMatrix();
     withReadLock([&] {
-        if (_meshInitialized) {
+        gpu::BufferView::Index numVertices = (gpu::BufferView::Index)_mesh->getNumVertices();
+        if (!_meshReady) {
+            // we aren't ready to return a mesh.  the caller will have to try again later.
+            success = false;
+        } else if (numVertices == 0) {
+            // we are ready, but there are no triangles in the mesh.
+            success = true;
+        } else {
             success = true;
             // the mesh will be in voxel-space.  transform it into object-space
-            meshProxy = new MeshProxy(
+            meshProxy = new SimpleMeshProxy(
                 _mesh->map([=](glm::vec3 position){ return glm::vec3(transform * glm::vec4(position, 1.0f)); },
-                           [=](glm::vec3 normal){ return glm::vec3(transform * glm::vec4(normal, 0.0f)); },
-                           [](uint32_t index){ return index; }));
+                           [=](glm::vec3 color){ return color; },
+                           [=](glm::vec3 normal){ return glm::normalize(glm::vec3(transform * glm::vec4(normal, 0.0f))); },
+                           [&](uint32_t index){ return index; }));
+            result << meshProxy;
         }
     });
-    result = meshToScriptValue(engine, meshProxy);
     return success;
 }

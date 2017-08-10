@@ -28,9 +28,26 @@ void blend(size_t numPoses, const AnimPose* a, const AnimPose* b, float alpha, A
         }
 
         result[i].scale() = lerp(aPose.scale(), bPose.scale(), alpha);
-        result[i].rot() = glm::normalize(glm::lerp(aPose.rot(), q2, alpha));
+        result[i].rot() = safeLerp(aPose.rot(), bPose.rot(), alpha);
         result[i].trans() = lerp(aPose.trans(), bPose.trans(), alpha);
     }
+}
+
+glm::quat averageQuats(size_t numQuats, const glm::quat* quats) {
+    if (numQuats == 0) {
+        return glm::quat();
+    }
+    glm::quat accum = quats[0];
+    glm::quat firstRot = quats[0];
+    for (size_t i = 1; i < numQuats; i++) {
+        glm::quat rot = quats[i];
+        float dot = glm::dot(firstRot, rot);
+        if (dot < 0.0f) {
+            rot = -rot;
+        }
+        accum += rot;
+    }
+    return glm::normalize(accum);
 }
 
 float accumulateTime(float startFrame, float endFrame, float timeScale, float currentFrame, float dt, bool loopFlag,

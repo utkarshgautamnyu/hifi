@@ -23,7 +23,7 @@
 #include <PathUtils.h>
 #include <TextureCache.h>
 #include <gpu/Context.h>
-#include <TabletScriptingInterface.h>
+#include <ui/TabletScriptingInterface.h>
 
 #include "EntityTreeRenderer.h"
 #include "EntitiesRendererLogging.h"
@@ -69,23 +69,10 @@ RenderableWebEntityItem::~RenderableWebEntityItem() {
     }
 }
 
-bool RenderableWebEntityItem::buildWebSurface(QSharedPointer<EntityTreeRenderer> renderer) {
+bool RenderableWebEntityItem::buildWebSurface() {
     if (_currentWebCount >= MAX_CONCURRENT_WEB_VIEWS) {
         qWarning() << "Too many concurrent web views to create new view";
         return false;
-    }
-    QString javaScriptToInject;
-    QFile webChannelFile(":qtwebchannel/qwebchannel.js");
-    QFile createGlobalEventBridgeFile(PathUtils::resourcesPath() + "/html/createGlobalEventBridge.js");
-    if (webChannelFile.open(QFile::ReadOnly | QFile::Text) &&
-        createGlobalEventBridgeFile.open(QFile::ReadOnly | QFile::Text)) {
-        QString webChannelStr = QTextStream(&webChannelFile).readAll();
-        QString createGlobalEventBridgeStr = QTextStream(&createGlobalEventBridgeFile).readAll();
-
-        // concatenate these js files
-        _javaScriptToInject = webChannelStr + createGlobalEventBridgeStr;
-    } else {
-        qCWarning(entitiesrenderer) << "unable to find qwebchannel.js or createGlobalEventBridge.js";
     }
 
     // Save the original GL context, because creating a QML surface will create a new context
@@ -127,7 +114,7 @@ bool RenderableWebEntityItem::buildWebSurface(QSharedPointer<EntityTreeRenderer>
 
     _webSurface->resume();
     _webSurface->getRootItem()->setProperty("url", _sourceUrl);
-    _webSurface->getRootContext()->setContextProperty("desktop", QVariant());
+    _webSurface->getSurfaceContext()->setContextProperty("desktop", QVariant());
     // FIXME - Keyboard HMD only: Possibly add "HMDinfo" object to context for WebView.qml.
 
     // forward web events to EntityScriptingInterface
@@ -145,6 +132,8 @@ bool RenderableWebEntityItem::buildWebSurface(QSharedPointer<EntityTreeRenderer>
             handlePointerEvent(event);
         }
     };
+
+    auto renderer = DependencyManager::get<EntityTreeRenderer>();
     _mousePressConnection = QObject::connect(renderer.data(), &EntityTreeRenderer::mousePressOnEntity, forwardPointerEvent);
     _mouseReleaseConnection = QObject::connect(renderer.data(), &EntityTreeRenderer::mouseReleaseOnEntity, forwardPointerEvent);
     _mouseMoveConnection = QObject::connect(renderer.data(), &EntityTreeRenderer::mouseMoveOnEntity, forwardPointerEvent);
@@ -198,8 +187,7 @@ void RenderableWebEntityItem::render(RenderArgs* args) {
     #endif
 
     if (!_webSurface) {
-        auto renderer = qSharedPointerCast<EntityTreeRenderer>(args->_renderer);
-        if (!buildWebSurface(renderer)) {
+        if (!buildWebSurface()) {
             return;
         }
         _fadeStartTime = usecTimestampNow();
@@ -216,7 +204,7 @@ void RenderableWebEntityItem::render(RenderArgs* args) {
 
     if (!_texture) {
         auto webSurface = _webSurface;
-        _texture = gpu::TexturePointer(gpu::Texture::createExternal2D(OffscreenQmlSurface::getDiscardLambda()));
+        _texture = gpu::Texture::createExternal(OffscreenQmlSurface::getDiscardLambda());
         _texture->setSource(__FUNCTION__);
     }
     OffscreenQmlSurface::TextureAndFence newTextureAndFence;
@@ -266,12 +254,9 @@ void RenderableWebEntityItem::loadSourceURL() {
             _webSurface->setMaxFps(DEFAULT_MAX_FPS);
         }
 
-        _webSurface->load("WebView.qml", [&](QQmlContext* context, QObject* obj) {
-            context->setContextProperty("eventBridgeJavaScriptToInject", QVariant(_javaScriptToInject));
-        });
-
+        _webSurface->load("WebEntityView.qml");
         _webSurface->getRootItem()->setProperty("url", _sourceUrl);
-        _webSurface->getRootContext()->setContextProperty("desktop", QVariant());
+        _webSurface->getSurfaceContext()->setContextProperty("desktop", QVariant());
 
     } else {
         _contentType = qmlContent;
@@ -280,11 +265,10 @@ void RenderableWebEntityItem::loadSourceURL() {
 
         if (_webSurface->getRootItem() && _webSurface->getRootItem()->objectName() == "tabletRoot") {
             auto tabletScriptingInterface = DependencyManager::get<TabletScriptingInterface>();
-            tabletScriptingInterface->setQmlTabletRoot("com.highfidelity.interface.tablet.system",
-                                                       _webSurface->getRootItem(), _webSurface.data());
+            tabletScriptingInterface->setQmlTabletRoot("com.highfidelity.interface.tablet.system", _webSurface.data());
         }
     }
-    _webSurface->getRootContext()->setContextProperty("globalPosition", vec3toVariant(getPosition()));
+    _webSurface->getSurfaceContext()->setContextProperty("globalPosition", vec3toVariant(getPosition()));
 }
 
 
@@ -386,7 +370,7 @@ void RenderableWebEntityItem::destroyWebSurface() {
 
         if (rootItem && rootItem->objectName() == "tabletRoot") {
             auto tabletScriptingInterface = DependencyManager::get<TabletScriptingInterface>();
-            tabletScriptingInterface->setQmlTabletRoot("com.highfidelity.interface.tablet.system", nullptr, nullptr);
+            tabletScriptingInterface->setQmlTabletRoot("com.highfidelity.interface.tablet.system", nullptr);
         }
 
         // Fix for crash in QtWebEngineCore when rapidly switching domains
@@ -420,7 +404,7 @@ void RenderableWebEntityItem::update(const quint64& now) {
 
     if (_webSurface) {
         // update globalPosition
-        _webSurface->getRootContext()->setContextProperty("globalPosition", vec3toVariant(getPosition()));
+        _webSurface->getSurfaceContext()->setContextProperty("globalPosition", vec3toVariant(getPosition()));
     }
 
     auto interval = now - _lastRenderTime;
