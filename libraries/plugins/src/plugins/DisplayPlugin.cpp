@@ -17,7 +17,20 @@ void DisplayPlugin::incrementPresentCount() {
 #endif
 
     ++_presentedFrameIndex;
-    //qDebug() << "grab DisplayPlugin::incrementPresentCount postEvent Present";
-    qApp->postEvent(qApp, new QEvent(static_cast<QEvent::Type>(Present)), Qt::HighEventPriority);
-    // Alert the app that it needs to paint a new presentation frame
+
+    {
+        QMutexLocker locker(&_presentMutex);
+        _presentCondition.wakeAll();
+    }
+
+    emit presented(_presentedFrameIndex);
+}
+
+void DisplayPlugin::waitForPresent() {
+    QMutexLocker locker(&_presentMutex);
+    while (isActive()) {
+        if (_presentCondition.wait(&_presentMutex, MSECS_PER_SECOND)) {
+            break;
+        }
+    }
 }

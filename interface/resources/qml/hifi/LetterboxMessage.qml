@@ -32,14 +32,15 @@ Item {
         radius: popupRadius
     }
     Rectangle {
-        width: Math.max(parent.width * 0.75, 400)
+        id: textContainer;
+        width: Math.max(parent.width * 0.8, 400)
         height: contentContainer.height + 50
         anchors.centerIn: parent
         radius: popupRadius
         color: "white"
         Item {
             id: contentContainer
-            width: parent.width - 60
+            width: parent.width - 50
             height: childrenRect.height
             anchors.centerIn: parent
             Item {
@@ -85,6 +86,28 @@ Item {
                     wrapMode: Text.WordWrap
                     textFormat: Text.StyledText
                 }
+                HiFiGlyphs {
+                    id: closeGlyphButton
+                    text: hifi.glyphs.close
+                    size: headerTextPixelSize
+                    anchors.top: parent.top
+                    anchors.topMargin: -20
+                    anchors.right: parent.right
+                    anchors.rightMargin: -20
+                    MouseArea {
+                        anchors.fill: closeGlyphButton
+                        hoverEnabled: true
+                        onEntered: {
+                            parent.text = hifi.glyphs.closeInverted;
+                        }
+                        onExited: {
+                            parent.text = hifi.glyphs.close;
+                        }
+                        onClicked: {
+                            letterbox.visible = false;
+                        }
+                    }
+                }
             }
             // Popup Text
             Text {
@@ -105,11 +128,51 @@ Item {
                 color: hifi.colors.darkGray
                 wrapMode: Text.WordWrap
                 textFormat: Text.StyledText
+                onLinkActivated: {
+                    Qt.openUrlExternally(link)
+                }
             }
         }
     }
+    // Left gray MouseArea
     MouseArea {
-        anchors.fill: parent
+        anchors.left: parent.left;
+        anchors.right: textContainer.left;
+        anchors.top: textContainer.top;
+        anchors.bottom: textContainer.bottom;
+        acceptedButtons: Qt.LeftButton
+        onClicked: {
+            letterbox.visible = false
+        }
+    }
+    // Right gray MouseArea
+    MouseArea {
+        anchors.left: textContainer.left;
+        anchors.right: parent.left;
+        anchors.top: textContainer.top;
+        anchors.bottom: textContainer.bottom;
+        acceptedButtons: Qt.LeftButton
+        onClicked: {
+            letterbox.visible = false
+        }
+    }
+    // Top gray MouseArea
+    MouseArea {
+        anchors.left: parent.left;
+        anchors.right: parent.right;
+        anchors.top: parent.top;
+        anchors.bottom: textContainer.top;
+        acceptedButtons: Qt.LeftButton
+        onClicked: {
+            letterbox.visible = false
+        }
+    }
+    // Bottom gray MouseArea
+    MouseArea {
+        anchors.left: parent.left;
+        anchors.right: parent.right;
+        anchors.top: textContainer.bottom;
+        anchors.bottom: parent.bottom;
         acceptedButtons: Qt.LeftButton
         onClicked: {
             letterbox.visible = false

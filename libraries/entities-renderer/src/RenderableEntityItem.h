@@ -14,6 +14,7 @@
 
 #include <render/Scene.h>
 #include <EntityItem.h>
+#include <Sound.h>
 #include "AbstractViewStateInterface.h"
 #include "EntitiesRendererLogging.h"
 
@@ -34,13 +35,27 @@ enum class RenderItemStatusIcon {
 void makeEntityItemStatusGetters(EntityItemPointer entity, render::Item::Status::Getters& statusGetters);
 
 
+// Renderable entity item interface
+class RenderableEntityInterface {
+public:
+    virtual void render(RenderArgs* args) {};
+    virtual bool addToScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) = 0;
+    virtual void removeFromScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) = 0;
+    const SharedSoundPointer& getCollisionSound() { return _collisionSound; }
+    void setCollisionSound(const SharedSoundPointer& sound) { _collisionSound = sound; }
+    virtual RenderableEntityInterface* getRenderableInterface() { return nullptr; }
+private:
+    SharedSoundPointer _collisionSound;
+};
+
 class RenderableEntityItemProxy {
 public:
-    RenderableEntityItemProxy(EntityItemPointer entity, render::ItemID metaID) : _entity(entity), _metaID(metaID) { }
+    RenderableEntityItemProxy(const EntityItemPointer& entity, render::ItemID metaID)
+        : _entity(entity), _metaID(metaID) {}
     typedef render::Payload<RenderableEntityItemProxy> Payload;
     typedef Payload::DataPointer Pointer;
 
-    EntityItemPointer _entity;
+    const EntityItemPointer _entity;
     render::ItemID _metaID;
 };
 
@@ -51,10 +66,11 @@ namespace render {
    template <> uint32_t metaFetchMetaSubItems(const RenderableEntityItemProxy::Pointer& payload, ItemIDs& subItems);
 }
 
+
 // Mixin class for implementing basic single item rendering
-class SimpleRenderableEntityItem {
+class SimplerRenderableEntitySupport : public RenderableEntityInterface {
 public:
-    bool addToScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) {
+    bool addToScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) override {
         _myItem = scene->allocateID();
 
         auto renderData = std::make_shared<RenderableEntityItemProxy>(self, _myItem);
@@ -64,13 +80,13 @@ public:
         makeEntityItemStatusGetters(self, statusGetters);
         renderPayload->addStatusGetters(statusGetters);
 
-        pendingChanges.resetItem(_myItem, renderPayload);
+        transaction.resetItem(_myItem, renderPayload);
 
         return true;
     }
 
-    void removeFromScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) {
-        pendingChanges.removeItem(_myItem);
+    void removeFromScene(const EntityItemPointer& self, const render::ScenePointer& scene, render::Transaction& transaction) override {
+        transaction.removeItem(_myItem);
         render::Item::clearID(_myItem);
     }
 
@@ -79,19 +95,18 @@ public:
             return;
         }
 
-        render::PendingChanges pendingChanges;
+        render::Transaction transaction;
         render::ScenePointer scene = AbstractViewStateInterface::instance()->getMain3DScene();
 
         if (scene) {
-            pendingChanges.updateItem<RenderableEntityItemProxy>(_myItem, [](RenderableEntityItemProxy& data) {
+            transaction.updateItem<RenderableEntityItemProxy>(_myItem, [](RenderableEntityItemProxy& data) {
             });
 
-            scene->enqueuePendingChanges(pendingChanges);
+            scene->enqueueTransaction(transaction);
         } else {
             qCWarning(entitiesrenderer) << "SimpleRenderableEntityItem::notifyChanged(), Unexpected null scene, possibly during application shutdown";
         }
     }
-
 private:
     render::ItemID _myItem { render::Item::INVALID_ITEM_ID };
 };
@@ -99,20 +114,18 @@ private:
 
 #define SIMPLE_RENDERABLE() \
 public: \
-    virtual bool addToScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) override { return _renderHelper.addToScene(self, scene, pendingChanges); } \
-    virtual void removeFromScene(EntityItemPointer self, std::shared_ptr<render::Scene> scene, render::PendingChanges& pendingChanges) override { _renderHelper.removeFromScene(self, scene, pendingChanges); } \
-    virtual void locationChanged(bool tellPhysics = true) override { EntityItem::locationChanged(tellPhysics); _renderHelper.notifyChanged(); } \
-    virtual void dimensionsChanged() override { EntityItem::dimensionsChanged(); _renderHelper.notifyChanged(); } \
+    virtual void locationChanged(bool tellPhysics = true) override { EntityItem::locationChanged(tellPhysics); notifyChanged(); } \
+    virtual void dimensionsChanged() override { EntityItem::dimensionsChanged(); notifyChanged(); } \
+    virtual RenderableEntityInterface* getRenderableInterface() override { return this; } \
     void checkFading() { \
         bool transparent = isTransparent(); \
         if (transparent != _prevIsTransparent) { \
-            _renderHelper.notifyChanged(); \
+            notifyChanged(); \
             _isFading = false; \
             _prevIsTransparent = transparent; \
         } \
     } \
 private: \
-    SimpleRenderableEntityItem _renderHelper; \
     bool _prevIsTransparent { isTransparent() };
 
 

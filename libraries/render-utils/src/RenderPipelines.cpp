@@ -15,6 +15,7 @@
 #include <gpu/Context.h>
 #include <gpu/StandardShaderLib.h>
 
+#include "StencilMaskPass.h"
 #include "DeferredLightingEffect.h"
 #include "TextureCache.h"
 #include "render/DrawTask.h"
@@ -27,6 +28,12 @@
 #include "skin_model_vert.h"
 #include "skin_model_shadow_vert.h"
 #include "skin_model_normal_map_vert.h"
+
+#include "simple_vert.h"
+#include "simple_textured_frag.h"
+#include "simple_textured_unlit_frag.h"
+#include "simple_transparent_textured_frag.h"
+#include "simple_transparent_textured_unlit_frag.h"
 
 #include "model_frag.h"
 #include "model_unlit_frag.h"
@@ -70,8 +77,8 @@ void initForwardPipelines(ShapePlumber& plumber);
 void addPlumberPipeline(ShapePlumber& plumber,
                         const ShapeKey& key, const gpu::ShaderPointer& vertex, const gpu::ShaderPointer& pixel);
 
-void batchSetter(const ShapePipeline& pipeline, gpu::Batch& batch);
-void lightBatchSetter(const ShapePipeline& pipeline, gpu::Batch& batch);
+void batchSetter(const ShapePipeline& pipeline, gpu::Batch& batch, RenderArgs* args);
+void lightBatchSetter(const ShapePipeline& pipeline, gpu::Batch& batch, RenderArgs* args);
 
 void initOverlay3DPipelines(ShapePlumber& plumber) {
     auto vertex = gpu::Shader::createVertex(std::string(overlay3D_vert));
@@ -136,6 +143,7 @@ void initOverlay3DPipelines(ShapePlumber& plumber) {
 
 void initDeferredPipelines(render::ShapePlumber& plumber) {
     // Vertex shaders
+    auto simpleVertex = gpu::Shader::createVertex(std::string(simple_vert));
     auto modelVertex = gpu::Shader::createVertex(std::string(model_vert));
     auto modelNormalMapVertex = gpu::Shader::createVertex(std::string(model_normal_map_vert));
     auto modelLightmapVertex = gpu::Shader::createVertex(std::string(model_lightmap_vert));
@@ -146,6 +154,10 @@ void initDeferredPipelines(render::ShapePlumber& plumber) {
     auto skinModelShadowVertex = gpu::Shader::createVertex(std::string(skin_model_shadow_vert));
 
     // Pixel shaders
+    auto simplePixel = gpu::Shader::createPixel(std::string(simple_textured_frag));
+    auto simpleUnlitPixel = gpu::Shader::createPixel(std::string(simple_textured_unlit_frag));
+    auto simpleTranslucentPixel = gpu::Shader::createPixel(std::string(simple_transparent_textured_frag));
+    auto simpleTranslucentUnlitPixel = gpu::Shader::createPixel(std::string(simple_transparent_textured_unlit_frag));
     auto modelPixel = gpu::Shader::createPixel(std::string(model_frag));
     auto modelUnlitPixel = gpu::Shader::createPixel(std::string(model_unlit_frag));
     auto modelNormalMapPixel = gpu::Shader::createPixel(std::string(model_normal_map_frag));
@@ -167,14 +179,14 @@ void initDeferredPipelines(render::ShapePlumber& plumber) {
             Key::Builder().withMaterial(),
             modelVertex, modelPixel);
     addPipeline(
-            Key::Builder(),
-            modelVertex, modelPixel);
+        Key::Builder(),
+        simpleVertex, simplePixel);
     addPipeline(
             Key::Builder().withMaterial().withUnlit(),
             modelVertex, modelUnlitPixel);
     addPipeline(
-            Key::Builder().withUnlit(),
-            modelVertex, modelUnlitPixel);
+        Key::Builder().withUnlit(),
+        simpleVertex, simpleUnlitPixel);
     addPipeline(
             Key::Builder().withMaterial().withTangents(),
             modelNormalMapVertex, modelNormalMapPixel);
@@ -189,14 +201,14 @@ void initDeferredPipelines(render::ShapePlumber& plumber) {
             Key::Builder().withMaterial().withTranslucent(),
             modelVertex, modelTranslucentPixel);
     addPipeline(
-            Key::Builder().withTranslucent(),
-            modelVertex, modelTranslucentPixel);
+        Key::Builder().withTranslucent(),
+        simpleVertex, simpleTranslucentPixel);
     addPipeline(
             Key::Builder().withMaterial().withTranslucent().withUnlit(),
             modelVertex, modelTranslucentUnlitPixel);
     addPipeline(
-            Key::Builder().withTranslucent().withUnlit(),
-            modelVertex, modelTranslucentUnlitPixel);
+        Key::Builder().withTranslucent().withUnlit(),
+        simpleVertex, simpleTranslucentUnlitPixel);
     addPipeline(
             Key::Builder().withMaterial().withTranslucent().withTangents(),
             modelNormalMapVertex, modelTranslucentPixel);
@@ -340,6 +352,7 @@ void addPlumberPipeline(ShapePlumber& plumber,
         bool isWireframed = (i & 4);
 
         auto state = std::make_shared<gpu::State>();
+        PrepareStencil::testMaskDrawShape(*state);
 
         // Depth test depends on transparency
         state->setDepthTest(true, !key.isTranslucent(), gpu::LESS_EQUAL);
@@ -367,7 +380,7 @@ void addPlumberPipeline(ShapePlumber& plumber,
     }
 }
 
-void batchSetter(const ShapePipeline& pipeline, gpu::Batch& batch) {
+void batchSetter(const ShapePipeline& pipeline, gpu::Batch& batch, RenderArgs* args) {
     // Set a default albedo map
     batch.setResourceTexture(render::ShapePipeline::Slot::MAP::ALBEDO,
                              DependencyManager::get<TextureCache>()->getWhiteTexture());
@@ -390,13 +403,13 @@ void batchSetter(const ShapePipeline& pipeline, gpu::Batch& batch) {
     }
 }
 
-void lightBatchSetter(const ShapePipeline& pipeline, gpu::Batch& batch) {
+void lightBatchSetter(const ShapePipeline& pipeline, gpu::Batch& batch, RenderArgs* args) {
     // Set the batch
-    batchSetter(pipeline, batch);
+    batchSetter(pipeline, batch, args);
 
     // Set the light
     if (pipeline.locations->lightBufferUnit >= 0) {
-        DependencyManager::get<DeferredLightingEffect>()->setupKeyLightBatch(batch,
+        DependencyManager::get<DeferredLightingEffect>()->setupKeyLightBatch(args, batch,
                                                                              pipeline.locations->lightBufferUnit,
                                                                              pipeline.locations->lightAmbientBufferUnit,
                                                                              pipeline.locations->lightAmbientMapUnit);

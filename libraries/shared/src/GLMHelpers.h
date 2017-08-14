@@ -17,6 +17,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/component_wise.hpp>
 
 // Bring the most commonly used GLM types into the default namespace
 using glm::ivec2;
@@ -50,10 +51,17 @@ using glm::quat;
 // this is where the coordinate system is represented
 const glm::vec3 IDENTITY_RIGHT = glm::vec3( 1.0f, 0.0f, 0.0f);
 const glm::vec3 IDENTITY_UP    = glm::vec3( 0.0f, 1.0f, 0.0f);
-const glm::vec3 IDENTITY_FRONT = glm::vec3( 0.0f, 0.0f,-1.0f);
+const glm::vec3 IDENTITY_FORWARD = glm::vec3( 0.0f, 0.0f,-1.0f);
 
 glm::quat safeMix(const glm::quat& q1, const glm::quat& q2, float alpha);
 
+class Matrices {
+public:
+    static const mat4 IDENTITY;
+    static const mat4 X_180;
+    static const mat4 Y_180;
+    static const mat4 Z_180;
+};
 
 class Quaternions {
  public:
@@ -244,6 +252,9 @@ inline bool isNaN(const glm::vec3& value) { return isNaN(value.x) || isNaN(value
 inline bool isNaN(const glm::quat& value) { return isNaN(value.w) || isNaN(value.x) || isNaN(value.y) || isNaN(value.z); }
 
 glm::mat4 orthoInverse(const glm::mat4& m);
+
+//  Return a random vector of average length 1
+glm::vec3 randVector();
 
 //
 // Safe replacement of glm_mat4_mul() for unaligned arguments instead of __m128

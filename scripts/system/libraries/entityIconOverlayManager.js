@@ -1,6 +1,7 @@
 /* globals EntityIconOverlayManager:true */
 
 EntityIconOverlayManager = function(entityTypes, getOverlayPropertiesFunc) {
+
     var visible = false;
 
     // List of all created overlays
@@ -32,20 +33,25 @@ EntityIconOverlayManager = function(entityTypes, getOverlayPropertiesFunc) {
         }
     };
 
+    // Finds the id for the corresponding entity that is associated with an overlay id. 
+    // Returns null if the overlay id is not contained in this manager.
+    this.findEntity = function(overlayId) {
+        for (var id in entityOverlays) {
+            if (overlayId === entityOverlays[id]) {
+                return entityIDs[id];
+            }
+        }
+        
+        return null;
+    };
+
     this.findRayIntersection = function(pickRay) {
         var result = Overlays.findRayIntersection(pickRay);
-        var found = false;
 
         if (result.intersects) {
-            for (var id in entityOverlays) {
-                if (result.overlayID === entityOverlays[id]) {
-                    result.entityID = entityIDs[id];
-                    found = true;
-                    break;
-                }
-            }
+            result.entityID = this.findEntity(result.overlayID);
 
-            if (!found) {
+            if (result.entityID === null) {
                 result.intersects = false;
             }
         }
@@ -60,6 +66,29 @@ EntityIconOverlayManager = function(entityTypes, getOverlayPropertiesFunc) {
                 Overlays.editOverlay(entityOverlays[id], {
                     visible: visible
                 });
+            }
+        }
+    };
+
+
+    this.setIconsSelectable = function(arrayOfSelectedEntityIDs, isIconsSelectable) {
+        if (arrayOfSelectedEntityIDs === null) {
+            for (var id in entityOverlays) {
+                Overlays.editOverlay(entityOverlays[id], {
+                    ignoreRayIntersection: isIconsSelectable
+                });
+            }
+        } else {
+            for (var id in entityOverlays) {
+                if (arrayOfSelectedEntityIDs.indexOf(id) !== -1) { // in the entityOverlays array and selectable
+                    Overlays.editOverlay(entityOverlays[id], {
+                        ignoreRayIntersection: isIconsSelectable
+                    });
+                } else {
+                    Overlays.editOverlay(entityOverlays[id], {
+                        ignoreRayIntersection: !isIconsSelectable
+                    });
+                }
             }
         }
     };
@@ -108,6 +137,9 @@ EntityIconOverlayManager = function(entityTypes, getOverlayPropertiesFunc) {
                 for (var key in customProperties) {
                     overlayProperties[key] = customProperties[key];
                 }
+            }
+            if(properties.type === 'ParticleEffect' || properties.type === 'Light'){
+                overlayProperties.ignoreRayIntersection = true;
             }
             Overlays.editOverlay(overlay, overlayProperties);
         }

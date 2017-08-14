@@ -19,7 +19,7 @@ function pushAll(dest, orig) {
 }
 
 if (!App.isAndroid()) {
-    pushAll(DEFAULT_SCRIPTS, [
+    pushAll(DEFAULT_SCRIPTS_COMBINED, [
         "system/progress.js",
         "system/away.js",
         "system/audio.js",
@@ -48,7 +48,7 @@ if (!App.isAndroid()) {
     ]);
 } else {
     print('defaultScripts.js - isAndroid check IT IS ANDROID');
-    pushAll(DEFAULT_SCRIPTS, [
+    pushAll(DEFAULT_SCRIPTS_COMBINED, [
         "system/progress.js",
         "system/away.js",
         "system/tablet-users.js",
@@ -104,16 +104,24 @@ if (Menu.menuExists(MENU_CATEGORY) && !Menu.menuItemExists(MENU_CATEGORY, MENU_I
     });
 }
 
-function runDefaultsTogether() {
-    for (var j in DEFAULT_SCRIPTS) {
-        Script.include(DEFAULT_SCRIPTS[j]);
+function loadSeparateDefaults() {
+    for (var i in DEFAULT_SCRIPTS_SEPARATE) {
+        Script.load(DEFAULT_SCRIPTS_SEPARATE[i]);
     }
 }
 
-function runDefaultsSeparately() {
-    for (var i in DEFAULT_SCRIPTS) {
-        Script.load(DEFAULT_SCRIPTS[i]);
+function runDefaultsTogether() {
+    for (var i in DEFAULT_SCRIPTS_COMBINED) {
+        Script.include(DEFAULT_SCRIPTS_COMBINED[i]);
     }
+    loadSeparateDefaults();
+}
+
+function runDefaultsSeparately() {
+    for (var i in DEFAULT_SCRIPTS_COMBINED) {
+        Script.load(DEFAULT_SCRIPTS_COMBINED[i]);
+    }
+    loadSeparateDefaults();
 }
 
 // start all scripts
