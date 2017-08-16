@@ -269,7 +269,6 @@ void DomainGatekeeper::updateNodePermissions() {
             userPerms.permissions |= NodePermissions::Permission::canRezPermanentEntities;
             userPerms.permissions |= NodePermissions::Permission::canRezTemporaryEntities;
             userPerms.permissions |= NodePermissions::Permission::canWriteToAssetServer;
-            userPerms.permissions |= NodePermissions::Permission::canReplaceDomainContent;
         } else {
             // this node is an agent
             const QHostAddress& addr = node->getLocalSocket().getAddress();
@@ -358,7 +357,6 @@ SharedNodePointer DomainGatekeeper::processAssignmentConnectRequest(const NodeCo
     userPerms.permissions |= NodePermissions::Permission::canRezPermanentEntities;
     userPerms.permissions |= NodePermissions::Permission::canRezTemporaryEntities;
     userPerms.permissions |= NodePermissions::Permission::canWriteToAssetServer;
-    userPerms.permissions |= NodePermissions::Permission::canReplaceDomainContent;
     newNode->setPermissions(userPerms);
     return newNode;
 }
