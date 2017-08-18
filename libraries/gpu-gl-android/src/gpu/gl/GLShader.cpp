@@ -190,6 +190,9 @@ bool GLShader::makeProgram(GLBackend& backend, Shader& shader, const Shader::Bin
             Shader::SlotSet samplers;
             makeUniformSlots(shaderObject.glprogram, slotBindings, uniforms, textures, samplers);
 
+			Shader::SlotSet resourceBuffers;
+            makeResourceBufferSlots(shaderObject.glprogram, slotBindings, resourceBuffers);
+
             Shader::SlotSet inputs;
             makeInputSlots(shaderObject.glprogram, slotBindings, inputs);
 
@@ -198,7 +201,7 @@ bool GLShader::makeProgram(GLBackend& backend, Shader& shader, const Shader::Bin
 
             // Define the public slots only from the default version
             if (version == 0) {
-                shader.defineSlots(uniforms, buffers, textures, samplers, inputs, outputs);
+                shader.defineSlots(uniforms, buffers, resourceBuffers, textures, samplers, inputs, outputs);
             } // else
             {
                 GLShader::UniformMapping mapping;

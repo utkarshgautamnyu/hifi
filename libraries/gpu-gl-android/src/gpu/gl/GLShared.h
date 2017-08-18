@@ -19,6 +19,12 @@ Q_DECLARE_LOGGING_CATEGORY(trace_render_gpu_gl)
 
 namespace gpu { namespace gl { 
 
+#ifdef GPU_SSBO_TRANSFORM_OBJECT
+    static const GLint TRANSFORM_OBJECT_SLOT  { 14 }; // SSBO binding slot
+#else
+    static const GLint TRANSFORM_OBJECT_SLOT  { 31 }; // TBO binding slot
+#endif
+
 // Create a fence and inject a GPU wait on the fence
 void serverWait();
 
@@ -45,6 +51,11 @@ int makeUniformSlots(GLuint glprogram, const Shader::BindingSet& slotBindings,
 int makeUniformBlockSlots(GLuint glprogram, const Shader::BindingSet& slotBindings, Shader::SlotSet& buffers);
 int makeInputSlots(GLuint glprogram, const Shader::BindingSet& slotBindings, Shader::SlotSet& inputs);
 int makeOutputSlots(GLuint glprogram, const Shader::BindingSet& slotBindings, Shader::SlotSet& outputs);
+//CLIMAX_MERGE_START
+//makeResourceBufferSlots has been added to glbacked as a virtual function and is being used in gl42 and gl45 overrides.
+//Since these files dont exist in the andoid version create a stub here.
+int makeResourceBufferSlots(GLuint glprogram, const Shader::BindingSet& slotBindings, Shader::SlotSet& resourceBuffers);
+//CLIMAX_MERGE_END
 void makeProgramBindings(ShaderObject& shaderObject);
 
 enum GLSyncState {
