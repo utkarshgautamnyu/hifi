@@ -142,8 +142,8 @@ GLTexture::GLTexture(const std::weak_ptr<GLBackend>& backend, const Texture& tex
     _storageStamp(texture.getStamp()),
     _target(getGLTextureType(texture)),
     _internalFormat(gl::GLTexelFormat::evalGLTexelFormatInternal(texture.getTexelFormat())),
-    _maxMip(texture.maxMip()),
-    _minMip(texture.minMip()),
+    _maxMip(texture.getMaxMip()),
+    _minMip(texture.getMinMip()),
     _virtualSize(texture.evalTotalSize()),
     _transferrable(transferrable)
 {
@@ -163,8 +163,8 @@ GLTexture::GLTexture(const std::weak_ptr<GLBackend>& backend, const Texture& tex
     _target(getGLTextureType(texture)),
     _internalFormat(GL_RGBA8),
     // FIXME force mips to 0?
-    _maxMip(texture.maxMip()),
-    _minMip(texture.minMip()),
+    _maxMip(texture.getMaxMip()),
+    _minMip(texture.getMinMip()),
     _virtualSize(0),
     _transferrable(false) 
 {
@@ -266,34 +266,37 @@ bool GLTexture::isReady() const {
 
 // Do any post-transfer operations that might be required on the main context / rendering thread
 void GLTexture::postTransfer() {
-    setSyncState(GLSyncState::Idle);
-    ++_transferCount;
+	//CLIMAX_MERGE_START
+	
+	// setSyncState(GLSyncState::Idle);
+    // ++_transferCount;
 
-    // At this point the mip pixels have been loaded, we can notify the gpu texture to abandon it's memory
-    switch (_gpuObject.getType()) {
-        case Texture::TEX_2D:
-            for (uint16_t i = 0; i < Sampler::MAX_MIP_LEVEL; ++i) {
-                if (_gpuObject.isStoredMipFaceAvailable(i)) {
-                    _gpuObject.notifyMipFaceGPULoaded(i);
-                }
-            }
-            break;
+    // // At this point the mip pixels have been loaded, we can notify the gpu texture to abandon it's memory
+    // switch (_gpuObject.getType()) {
+        // case Texture::TEX_2D:
+            // for (uint16_t i = 0; i < Sampler::MAX_MIP_LEVEL; ++i) {
+                // if (_gpuObject.isStoredMipFaceAvailable(i)) {
+                    // _gpuObject.notifyMipFaceGPULoaded(i);
+                // }
+            // }
+            // break;
 
-        case Texture::TEX_CUBE:
-            // transfer pixels from each faces
-            for (uint8_t f = 0; f < CUBE_NUM_FACES; f++) {
-                for (uint16_t i = 0; i < Sampler::MAX_MIP_LEVEL; ++i) {
-                    if (_gpuObject.isStoredMipFaceAvailable(i, f)) {
-                        _gpuObject.notifyMipFaceGPULoaded(i, f);
-                    }
-                    }
-                }
-            break;
+        // case Texture::TEX_CUBE:
+            // // transfer pixels from each faces
+            // for (uint8_t f = 0; f < CUBE_NUM_FACES; f++) {
+                // for (uint16_t i = 0; i < Sampler::MAX_MIP_LEVEL; ++i) {
+                    // if (_gpuObject.isStoredMipFaceAvailable(i, f)) {
+                        // _gpuObject.notifyMipFaceGPULoaded(i, f);
+                    // }
+                    // }
+                // }
+            // break;
 
-        default:
-            qCWarning(gpugllogging) << __FUNCTION__ << " case for Texture Type " << _gpuObject.getType() << " not supported";
-            break;
-    }
+        // default:
+            // qCWarning(gpugllogging) << __FUNCTION__ << " case for Texture Type " << _gpuObject.getType() << " not supported";
+            // break;
+    // }
+	//CLIMAX_MERGE_END
 }
 
 void GLTexture::initTextureTransferHelper() {
