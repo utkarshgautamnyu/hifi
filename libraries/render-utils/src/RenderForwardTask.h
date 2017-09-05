@@ -58,7 +58,9 @@ public:
     using JobModel = render::Job::ModelI<DrawTransparentDeferred, Inputs/*, Config*/>;
     DrawTransparentDeferred(render::ShapePlumberPointer shapePlumber) : _shapePlumber{ shapePlumber } {}
     //void configure(const Config& config) { _maxDrawn = config.maxDrawn; }
-    void run(const render::SceneContextPointer& sceneContext, const render::RenderContextPointer& renderContext, const Inputs& inputs);
+	//CLIMAX_MERGE_START
+	void run(const render::RenderContextPointer& renderContext, const Inputs& inputs);
+	//CLIMAX_MERGE_END
 protected:
     render::ShapePlumberPointer _shapePlumber;
     //int _maxDrawn; // initialized by Config

@@ -8,8 +8,9 @@
 
 #ifndef hifi_MyHead_h
 #define hifi_MyHead_h
-
-#include <avatars-renderer/Head.h>
+//CLIMAX_MERGE_START	
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/Head.h"
+//CLIMAX_MERGE_END
 
 class MyAvatar;
 class MyHead : public Head {

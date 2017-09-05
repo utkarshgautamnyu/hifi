@@ -14,8 +14,10 @@
 #include <NodeList.h>
 #include <recording/Deck.h>
 #include <Rig.h>
-#include <trackers/FaceTracker.h>
-#include <trackers/EyeTracker.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/trackers/src/trackers/FaceTracker.h"
+#include "../../../libraries/trackers/src/trackers/EyeTracker.h"
+//CLIMAX_MERGE_END
 
 #include "devices/DdeFaceTracker.h"
 #include "Application.h"

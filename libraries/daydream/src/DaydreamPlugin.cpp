@@ -27,14 +27,17 @@ DaydreamLibInstance::DaydreamLibInstance(){
         DisplayPluginList builtInDisplayPlugins = getDisplayPlugins();
         PluginManager::getInstance()->loadDisplayPlugins(builtInDisplayPlugins);
 
-        InputPlugin* INPUT_PLUGIN_POOL[] = {
-            new DaydreamControllerManager(),
-            nullptr
-        };
-        PluginManager::getInstance()->loadInputPlugins(INPUT_PLUGIN_POOL);
+		//CLIMAX_MERGE_START
+		//This function was removed by the merge
+        //InputPlugin* INPUT_PLUGIN_POOL[] = {
+         //   new DaydreamControllerManager(),
+          //  nullptr
+        //};
+        //PluginManager::getInstance()->loadInputPlugins(INPUT_PLUGIN_POOL);
 
-        InputPluginList builtInInputPlugins = getInputPlugins();
-        PluginManager::getInstance()->loadInputPlugins(builtInInputPlugins);
+        //InputPluginList builtInInputPlugins = getInputPlugins();
+        //PluginManager::getInstance()->loadInputPlugins(builtInInputPlugins);
+		//CLIMAX_MERGE_END
     });
   }
 

@@ -29,7 +29,16 @@ class GLESBackend : public GLBackend {
 public:
     explicit GLESBackend(bool syncCache) : Parent(syncCache) {}
     GLESBackend() : Parent() {}
+	virtual ~GLESBackend() {
+        // call resetStages here rather than in ~GLBackend dtor because it will call releaseResourceBuffer
+        // which is pure virtual from GLBackend's dtor.
+        resetStages();
+    }
+	
+	static const std::string GLES_VERSION;
+    const std::string& getVersion() const override { return GLES_VERSION; }
 
+	
     class GLESTexture : public GLTexture {
         using Parent = GLTexture;
         GLuint allocate();

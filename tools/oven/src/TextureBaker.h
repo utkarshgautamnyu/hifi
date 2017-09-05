@@ -16,7 +16,7 @@
 #include <QtCore/QUrl>
 #include <QtCore/QRunnable>
 
-#include <image/Image.h>
+#include <Image.h>
 
 #include "Baker.h"
 

@@ -10,8 +10,11 @@
 //
 
 #include "Image.h"
-
+//CLIMAX_MERGE_START
+#ifndef ANDROID
 #include <nvtt/nvtt.h>
+#endif
+//CLIMAX_MERGE_END
 
 #include <QUrl>
 #include <QImage>
@@ -28,7 +31,13 @@
 
 using namespace gpu;
 
+//CLIMAX_MERGE_START
+#ifndef ANDROID
 #define CPU_MIPMAPS 1
+#else
+#define CPU_MIPMAPS 0
+#endif
+//CLIMAX_MERGE_END
 
 static std::mutex settingsMutex;
 static Setting::Handle<bool> compressColorTextures("hifi.graphics.compressColorTextures", false);
@@ -291,7 +300,8 @@ QImage processSourceImage(const QImage& srcImage, bool cubemap) {
 
     return srcImage;
 }
-
+//CLIMAX_MERGE_START
+#ifndef ANDROID
 struct MyOutputHandler : public nvtt::OutputHandler {
     MyOutputHandler(gpu::Texture* texture, int face) : _texture(texture), _face(face) {}
 
@@ -330,7 +340,7 @@ struct MyErrorHandler : public nvtt::ErrorHandler {
         qCWarning(imagelogging) << "Texture compression error:" << nvtt::errorString(e);
     }
 };
-
+#endif
 void generateMips(gpu::Texture* texture, QImage& image, int face = -1) {
 #if CPU_MIPMAPS
     PROFILE_RANGE(resource_parse, "generateMips");
@@ -450,7 +460,7 @@ void generateMips(gpu::Texture* texture, QImage& image, int face = -1) {
     nvtt::Compressor compressor;
     compressor.process(inputOptions, compressionOptions, outputOptions);
 #else
-    texture->autoGenerateMips(-1);
+    texture->setAutoGenerateMips(true);
 #endif
 }
 

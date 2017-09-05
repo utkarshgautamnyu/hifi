@@ -65,7 +65,9 @@
 #include <AssetClient.h>
 #include <AssetUpload.h>
 #include <AutoUpdater.h>
-#include <Midi.h>
+//CLIMAX_MERGE_START
+#include "../../libraries/midi/src/Midi.h"
+//CLIMAX_MERGE_END
 #include <AudioInjectorManager.h>
 #include <AvatarBookmarks.h>
 #include <CursorManager.h>
@@ -131,7 +133,9 @@
 #ifndef ANDROID
 #include <steamworks-wrapper/SteamClient.h>
 #endif
-#include <TabletScriptingInterface.h>
+//CLIMAX_MERGE_START
+#include "../../libraries/ui/src/ui/TabletScriptingInterface.h"
+//CLIMAX_MERGE_END
 #include <Tooltip.h>
 #include <udt/PacketHeaders.h>
 #include <UserActivityLogger.h>
@@ -143,9 +147,10 @@
 #include <QmlWebWindowClass.h>
 #include <Preferences.h>
 #include <display-plugins/CompositorHelper.h>
-#include <trackers/EyeTracker.h>
-#include <avatars-renderer/ScriptAvatar.h>
-
+//CLIMAX_MERGE_START
+#include "../../libraries/trackers/src/trackers/EyeTracker.h"
+#include "../../libraries/avatars-renderer/src/avatars-renderer/ScriptAvatar.h"
+//CLIMAX_MERGE_END
 #include "AudioClient.h"
 #include "audio/AudioScope.h"
 #include "avatar/AvatarManager.h"

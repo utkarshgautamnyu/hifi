@@ -21,7 +21,9 @@
 #include <PIDController.h>
 #include <SimpleMovingAverage.h>
 #include <shared/RateCounter.h>
-#include <avatars-renderer/ScriptAvatar.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/ScriptAvatar.h"
+//CLIMAX_MERGE_END
 #include <AudioInjector.h>
 
 #include "AvatarMotionState.h"

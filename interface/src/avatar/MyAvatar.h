@@ -22,7 +22,9 @@
 
 #include <controllers/Pose.h>
 #include <controllers/Actions.h>
-#include <avatars-renderer/Avatar.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/Avatar.h"
+//MLIMAX_MERGE_END
 
 #include "AtRestDetector.h"
 #include "MyCharacterController.h"

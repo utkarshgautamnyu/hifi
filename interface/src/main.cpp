@@ -52,10 +52,10 @@ int main(int argc, const char* argv[]) {
 #ifdef ANDROID
     QLoggingCategory::setFilterRules("trace.*=false\ntrace.render=true\ntrace.render_gpu_gl=true\ntrace.render.details=true\ntrace.render_gpu_gl.details=true\ntrace.render_gpu=true\ntrace.render_gpu.details=true\ntrace.render_detail=true\ntrace.app=true");
     //QLoggingCategory::setFilterRules("trace.*=false\ntrace.render=true\ntrace.render_gpu_gl=true");
-    QFile scriptsDest(defaultScriptsLocation().toString());
+    QFile scriptsDest(PathUtils::defaultScriptsLocation().toString());
     if (!scriptsDest.exists()) {
         qDebug() << "Copying scripts dir";
-        copyDirDeep("assets:/scripts", defaultScriptsLocation().toLocalFile());
+        copyDirDeep("assets:/scripts", PathUtils::defaultScriptsLocation().toLocalFile());
     }
     qDebug() << "Resources path " << PathUtils::resourcesPath();
     QFile resourcesDest(PathUtils::resourcesPath());

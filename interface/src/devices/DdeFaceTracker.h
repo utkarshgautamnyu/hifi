@@ -23,9 +23,9 @@
 
 #include <DependencyManager.h>
 #include <ui/overlays/TextOverlay.h>
-
-#include <trackers/FaceTracker.h>
-
+//CLIMAX_MERGE_START
+#include "../../../libraries/trackers/src/trackers/FaceTracker.h"
+//CLIMAX_MERGE_END
 class DdeFaceTracker : public FaceTracker, public Dependency {
     Q_OBJECT
     SINGLETON_DEPENDENCY
