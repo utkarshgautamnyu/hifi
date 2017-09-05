@@ -660,7 +660,13 @@ SharedNodePointer LimitedNodeList::addOrUpdateNode(const QUuid& uuid, NodeType_t
         }
 
         // insert the new node and release our read lock
-        _nodeHash.emplace(newNode->getUUID(), newNodePointer);
+		//CLIMAX_MERGE_START
+		//Z:/HiFi_Android/HiFi_GIT/libraries/networking/src/LimitedNodeList.cpp:663:19: error: no member named 'emplace' in 'tbb::interface5::concurrent_unordered_map<QUuid, QSharedPointer<Node>, UUIDHasher,
+		//std::equal_to<QUuid>, tbb::tbb_allocator<std::pair<const QUuid, QSharedPointer<Node> > > >'
+		// either replace or osrt out the libs
+        //_nodeHash.emplace(newNode->getUUID(), newNodePointer);
+		_nodeHash.insert(UUIDNodePair(newNode->getUUID(), newNodePointer));
+		//CLIMAX_MERGE_END
         readLocker.unlock();
 
         qCDebug(networking) << "Added" << *newNode;

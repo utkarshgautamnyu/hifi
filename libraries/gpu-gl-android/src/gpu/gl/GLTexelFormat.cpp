@@ -225,11 +225,13 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
                 texel.internalFormat = GL_R8;
                 break;
 
-            case gpu::COMPRESSED_R:
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RED_RGTC1";
-                //texel.internalFormat = GL_COMPRESSED_RED_RGTC1;
-                break;
-
+				//CLIMAX_MERGE_START
+            // case gpu::COMPRESSED_R:
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RED_RGTC1";
+                // //texel.internalFormat = GL_COMPRESSED_RED_RGTC1;
+                // break;
+				//CLIMAX_MERGE_END
+				
             case gpu::DEPTH:
                 texel.internalFormat = GL_DEPTH_COMPONENT32_OES;
                 break;
@@ -270,14 +272,17 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
             case gpu::RGBA:
                 texel.internalFormat = GL_RGB8;
                 break;
-            case gpu::COMPRESSED_RGB:
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGB";
-                //texel.internalFormat = GL_COMPRESSED_RGB;
-                break;
-            case gpu::COMPRESSED_SRGB:
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB";
-                //texel.internalFormat = GL_COMPRESSED_SRGB;
-                break;
+				//CLIMAX_MERGE_START
+				//not needed?
+            // case gpu::COMPRESSED_RGB:
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGB";
+                // //texel.internalFormat = GL_COMPRESSED_RGB;
+                // break;
+            // case gpu::COMPRESSED_SRGB:
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB";
+                // //texel.internalFormat = GL_COMPRESSED_SRGB;
+                // break;
+				//CLIMAX_MERGE_END
             default:
                 qCDebug(gpugllogging) << "Unknown combination of texel format";
             }
@@ -319,15 +324,16 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
                 texel.internalFormat = GL_SRGB8_ALPHA8;
                 break;
 
-            case gpu::COMPRESSED_RGBA:
-                //texel.internalFormat = GL_COMPRESSED_RGBA;
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGBA";
-                break;
-            case gpu::COMPRESSED_SRGBA:
-                //texel.internalFormat = GL_COMPRESSED_SRGB_ALPHA;
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB_ALPHA";
-                break;
-
+				//CLIMAX_MERGE_START
+            // case gpu::COMPRESSED_RGBA:
+                // //texel.internalFormat = GL_COMPRESSED_RGBA;
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGBA";
+                // break;
+            // case gpu::COMPRESSED_SRGBA:
+                // //texel.internalFormat = GL_COMPRESSED_SRGB_ALPHA;
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB_ALPHA";
+                // break;
+				//CLIMAX_MERGE_END
                 // FIXME: WE will want to support this later
                 /*
                 case gpu::COMPRESSED_BC3_RGBA:
@@ -364,11 +370,12 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
             texel.type = ELEMENT_TYPE_TO_GL[dstFormat.getType()];
 
             switch (dstFormat.getSemantic()) {
-            case gpu::COMPRESSED_R: {
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RED_RGTC1";
-                //texel.internalFormat = GL_COMPRESSED_RED_RGTC1;
-                break;
-            }
+				//CLIMAX_MERGE_START
+            // case gpu::COMPRESSED_R: {
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RED_RGTC1";
+                // //texel.internalFormat = GL_COMPRESSED_RED_RGTC1;
+                // break;
+            // }
             case gpu::RGB:
             case gpu::RGBA:
             case gpu::SRGB:
@@ -530,14 +537,15 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
                 //texel.internalFormat = GL_SRGB8; // standard 2.2 gamma correction color
                 texel.internalFormat = GL_RGB8; // standard 2.2 gamma correction color
                 break;
-            case gpu::COMPRESSED_RGB:
-                //texel.internalFormat = GL_COMPRESSED_RGB;
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGB";
-                break;
-            case gpu::COMPRESSED_SRGB:
-                //texel.internalFormat = GL_COMPRESSED_SRGB;
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB";
-                break;
+				//CLIMAX_MERGE_START
+            // case gpu::COMPRESSED_RGB:
+                // //texel.internalFormat = GL_COMPRESSED_RGB;
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGB";
+                // break;
+            // case gpu::COMPRESSED_SRGB:
+                // //texel.internalFormat = GL_COMPRESSED_SRGB;
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB";
+                // break;
             default:
                 qCDebug(gpugllogging) << "Unknown combination of texel format";
             }
@@ -617,14 +625,15 @@ GLTexelFormat GLTexelFormat::evalGLTexelFormat(const Element& dstFormat, const E
             case gpu::SRGBA:
                 texel.internalFormat = GL_SRGB8_ALPHA8; // standard 2.2 gamma correction color
                 break;
-            case gpu::COMPRESSED_RGBA:
-                //texel.internalFormat = GL_COMPRESSED_RGBA;
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGBA";
-                break;
-            case gpu::COMPRESSED_SRGBA:
-                qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB_ALPHA";
-                //texel.internalFormat = GL_COMPRESSED_SRGB_ALPHA;
-                break;
+				//CLIMAX_MERGE_START
+            // case gpu::COMPRESSED_RGBA:
+                // //texel.internalFormat = GL_COMPRESSED_RGBA;
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_RGBA";
+                // break;
+            // case gpu::COMPRESSED_SRGBA:
+                // qDebug() << "TODO: GLTexelFormat.cpp:evalGLTexelFormat GL_COMPRESSED_SRGB_ALPHA";
+                // //texel.internalFormat = GL_COMPRESSED_SRGB_ALPHA;
+                // break;
             default:
                 qCDebug(gpugllogging) << "Unknown combination of texel format";
             }

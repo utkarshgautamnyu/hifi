@@ -38,7 +38,7 @@ void GLESBackend::transferTransformState(const Batch& batch) const {
     }
 
     if (!batch._objects.empty()) {
-#ifdef GPU_SSBO_DRAW_CALL_INFO
+#ifdef GPU_SSBO_TRANSFORM_OBJECT
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _transform._objectBuffer);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sysmem.getSize(), sysmem.readData(), GL_STREAM_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -64,7 +64,7 @@ void GLESBackend::transferTransformState(const Batch& batch) const {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-#ifdef GPU_SSBO_DRAW_CALL_INFO
+#ifdef GPU_SSBO_TRANSFORM_OBJECT
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TRANSFORM_OBJECT_SLOT, _transform._objectBuffer);
 #else
     glActiveTexture(GL_TEXTURE0 + TRANSFORM_OBJECT_SLOT);

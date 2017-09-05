@@ -34,8 +34,9 @@ public:
         const Texture& texture = *texturePointer;
 
         // Special case external textures
-		//cgaggar: will break things. This is the only place where "isExternal()" is used.
-		//CLIMAX_MERGE_START
+		//CLIMAX_MERGE_START 
+		//Z:/HiFi_Android/HiFi_GIT/libraries/gpu-gl-android/src/gpu/gl/../gles/../gl/GLTexture.h:37:32: error: no member named 'isExternal' in 'gpu::Texture::Usage'
+		// The only instance of this being used again. replace.
         // if (texture.getUsage().isExternal()) {
             // Texture::ExternalUpdates updates = texture.getUpdates();
             // if (!updates.empty()) {
@@ -64,11 +65,12 @@ public:
                 // // Create the new texture object (replaces any previous texture object)
                 // new GLTextureType(backend.shared_from_this(), texture, update.first);
             // }
-
-            // // Return the texture object (if any) associated with the texture, without extensive logic
-            // // (external textures are 
-            // return Backend::getGPUObject<GLTextureType>(texture);
-        // }
+			
+			
+            // Return the texture object (if any) associated with the texture, without extensive logic
+            // (external textures are 
+            //return Backend::getGPUObject<GLTextureType>(texture);
+        //}
 		//CLIMAX_MERGE_END
         if (!texture.isDefined()) {
             // NO texture definition yet so let's avoid thinking

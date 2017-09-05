@@ -115,7 +115,7 @@ void GLESTexture::updateSize() const {
 // Move content bits from the CPU to the GPU for a given mip / face
 void GLESTexture::transferMip(uint16_t mipLevel, uint8_t face) const {
     auto mip = _gpuObject.accessStoredMipFace(mipLevel, face);
-    GLTexelFormat texelFormat = GLTexelFormat::evalGLTexelFormat(_gpuObject.getTexelFormat(), mip->getFormat());
+    GLTexelFormat texelFormat = GLTexelFormat::evalGLTexelFormat(_gpuObject.getTexelFormat(), _gpuObject.getStoredMipFormat());
     //GLenum target = getFaceTargets()[face];
     GLenum target = _target == GL_TEXTURE_2D ? GL_TEXTURE_2D : CUBE_FACE_LAYOUT[face];
     auto size = _gpuObject.evalMipDimensions(mipLevel);
