@@ -13,7 +13,7 @@
 #include <QMouseEvent>
 #include <QTouchEvent>
 #include <PointerEvent.h>
-#include <ui/OffscreenQmlSurface.h>
+#include <gl/OffscreenQmlSurface.h>
 
 #include <WebEntityItem.h>
 

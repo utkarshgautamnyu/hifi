@@ -17,9 +17,9 @@
 #include <map>
 
 #include <ColorUtils.h>
-
-#include <gpu/Resource.h>
-
+//CLIMAX_MERGE_START
+#include "../../../gpu/src/gpu/Resource.h"
+//CLIMAX_MERGE_END
 namespace model {
 
 class TextureMap;

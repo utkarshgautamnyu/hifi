@@ -108,7 +108,8 @@
 #include <OctreeSceneStats.h>
 #include <OffscreenUi.h>
 #include <gl/OffscreenGLCanvas.h>
-#include <ui/OffscreenQmlSurfaceCache.h>
+#include <gl/OffscreenQmlSurfaceCache.h>
+#include <ui/QmlWrapper.h>
 #include <PathUtils.h>
 #include <PerfStat.h>
 #include <PhysicsEngine.h>
@@ -135,6 +136,7 @@
 #endif
 //CLIMAX_MERGE_START
 #include "../../libraries/ui/src/ui/TabletScriptingInterface.h"
+#include "../../libraries/ui/src/ui/ToolbarScriptingInterface.h"
 //CLIMAX_MERGE_END
 #include <Tooltip.h>
 #include <udt/PacketHeaders.h>
@@ -414,7 +416,7 @@ public:
             }
 
             if (message->message == WM_DEVICECHANGE) {
-                Midi::USBchanged();                // re-scan the MIDI bus
+                Midi::USBchanged();  __ANDROID_API_N__              // re-scan the MIDI bus
             }
         }
         return false;
