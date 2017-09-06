@@ -17,8 +17,8 @@
 //CLIMAX_MERGE_START
 #ifndef ANDROID
 #include "RequestFilters.h"
-#endif
 
 void HFWebEngineRequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo& info) {
     RequestFilters::interceptHFWebEngineRequest(info);
 }
+#endif

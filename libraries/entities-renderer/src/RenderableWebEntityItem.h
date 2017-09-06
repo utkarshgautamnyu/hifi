@@ -13,8 +13,13 @@
 #include <QMouseEvent>
 #include <QTouchEvent>
 #include <PointerEvent.h>
+//CLIMAX_MERGE_START
+#ifndef ANDROID
 #include <gl/OffscreenQmlSurface.h>
-
+#else
+#include "../../gl-android/src/gl/OffscreenQmlSurface.h"
+#endif
+//CLIMAX_MERGE_END
 #include <WebEntityItem.h>
 
 #include "RenderableEntityItem.h"

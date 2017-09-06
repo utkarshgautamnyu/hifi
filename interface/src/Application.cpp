@@ -2104,7 +2104,7 @@ void Application::initializeUi() {
     auto offscreenUi = DependencyManager::get<OffscreenUi>();
     offscreenUi->create(_glWidget->qglContext());
 
-    auto surfaceContext = offscreenUi->getSurfaceContext();
+    auto surfaceContext = offscreenUi->getRootContext();
 
     offscreenUi->setProxyWindow(_window->windowHandle());
     offscreenUi->setBaseUrl(QUrl::fromLocalFile(PathUtils::resourcesPath() + "/qml/"));
