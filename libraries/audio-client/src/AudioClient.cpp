@@ -247,6 +247,10 @@ AudioClient::AudioClient() :
 }
 
 AudioClient::~AudioClient() {
+#ifdef ANDROID
+	_shouldRestartInputSetup = false; // intended stop should not restart the audio device
+#endif
+	
     if (_codec && _encoder) {
         _codec->releaseEncoder(_encoder);
         _encoder = nullptr;
@@ -1078,7 +1082,6 @@ void AudioClient::handleAudioInput(QByteArray& audioBuffer) {
 }
 
 void AudioClient::handleMicAudioInput() {
-    bool _shouldLogNow = rand() % 1000 < 5;
     if (!_inputDevice || _isPlayingBackRecording) {
         return;
     }

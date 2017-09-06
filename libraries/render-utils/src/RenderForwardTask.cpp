@@ -127,7 +127,8 @@ void Draw::run(const RenderContextPointer& renderContext,
     args->_batch = nullptr;
 }
 
-void DrawTransparentDeferred::run(const SceneContextPointer& sceneContext, const RenderContextPointer& renderContext, const Inputs& inputs) {
+//CLIMAX_MERGE_START
+void DrawTransparentDeferred::run(const RenderContextPointer& renderContext, const Inputs& inputs) {
     PROFILE_RANGE_EX(render, "DrawTransparentDeferred", 0xff555500, (uint64_t)1)
     assert(renderContext->args);
     assert(renderContext->args->hasViewFrustum());
@@ -149,7 +150,8 @@ void DrawTransparentDeferred::run(const SceneContextPointer& sceneContext, const
         batch.setViewTransform(viewMat);
         // Setup lighting model for all items;
         batch.setUniformBuffer(render::ShapePipeline::Slot::LIGHTING_MODEL, lightingModel->getParametersBuffer());
-        renderShapes(sceneContext, renderContext, _shapePlumber, inItems, -1);//_maxDrawn);
+        renderShapes(renderContext, _shapePlumber, inItems, -1);//_maxDrawn);
+		//CLIMAX_MERGE_END
         args->_batch = nullptr;
     });
 }

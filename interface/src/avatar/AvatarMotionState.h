@@ -13,8 +13,9 @@
 #define hifi_AvatarMotionState_h
 
 #include <QSet>
-
-#include <avatars-renderer/Avatar.h>
+//CLIMAX)MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/Avatar.h"
+//CLIMAX_MERGE_END
 #include <ObjectMotionState.h>
 #include <BulletUtil.h>
 

@@ -524,11 +524,15 @@ void OpenGLDisplayPlugin::renderFromTexture(gpu::Batch& batch, const gpu::Textur
         int xOffset = 0;
         int yOffset = 0;
         int newWidth = copyFbo->getWidth();
-        int newHeight = std::round(aspectRatio * (float) copyFbo->getWidth());
+		//CLIMAX_MERGE_START
+        int newHeight = round(aspectRatio * (float) copyFbo->getWidth());
+		//CLIMAX_MERGE_END
         if (newHeight > copyFbo->getHeight()) {
             // ok, so now fill height instead
             newHeight = copyFbo->getHeight();
-            newWidth = std::round((float)copyFbo->getHeight() / aspectRatio);
+			//CLIMAX_MERGE_START
+            newWidth = round((float)copyFbo->getHeight() / aspectRatio);
+			//CLIMAX_MERGE_END
             xOffset = (copyFbo->getWidth() - newWidth) / 2;
         } else {
             yOffset = (copyFbo->getHeight() - newHeight) / 2;
@@ -907,11 +911,18 @@ void OpenGLDisplayPlugin::copyTextureToQuickFramebuffer(NetworkTexturePointer ne
         GLuint fbo[2] {0, 0};
 
         // need mipmaps for blitting texture
-        glGenerateTextureMipmap(sourceTexture);
+		//CLIMAX_MERGE_START
+        glGenerateMipmap(sourceTexture);
+		//CLIMAX_MERGE_END
 
         // create 2 fbos (one for initial texture, second for scaled one)
+//CLIMAX_MERGE_START
+#ifndef ANDROID
         glCreateFramebuffers(2, fbo);
-
+#else
+		glGenFramebuffers(2, fbo);
+#endif
+//CLIMAX_MERGE_END
         // setup source fbo
         glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sourceTexture, 0);
@@ -932,16 +943,25 @@ void OpenGLDisplayPlugin::copyTextureToQuickFramebuffer(NetworkTexturePointer ne
         GLint newY = 0;
         float aspectRatio = (float)texHeight / (float)texWidth;
         GLint newWidth = target->width();
-        GLint newHeight = std::round(aspectRatio * (float) target->width());
+		//CLIMAX_MERGE_START
+        GLint newHeight = round(aspectRatio * (float) target->width());
         if (newHeight > target->height()) {
             newHeight = target->height();
-            newWidth = std::round((float)target->height() / aspectRatio);
+            newWidth = round((float)target->height() / aspectRatio);
+		//CLIMAX_MERGE_END	
             newX = (target->width() - newWidth) / 2;
         } else {
             newY = (target->height() - newHeight) / 2;
         }
-        glBlitNamedFramebuffer(fbo[0], fbo[1], 0, 0, texWidth, texHeight, newX, newY, newX + newWidth, newY + newHeight, GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
+//CLIMAX_MERGE_START
+#ifdef ANDROID
+		glBlitFramebuffer(0, 0, texWidth, texHeight, newX, newY, newX + newWidth, newY + newHeight, GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		//glBlitFramebuffer(srcvp.x, srcvp.y, srcvp.z, srcvp.w, dstvp.x, dstvp.y, dstvp.z, dstvp.w, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+#else
+		glBlitNamedFramebuffer(fbo[0], fbo[1], 0, 0, texWidth, texHeight, newX, newY, newX + newWidth, newY + newHeight, GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT, GL_NEAREST);
+#endif
+//CLIMAX_MERGE_END
+		
         // don't delete the textures!
         glDeleteFramebuffers(2, fbo);
         *fenceSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);

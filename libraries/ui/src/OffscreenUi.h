@@ -23,7 +23,7 @@
 
 #include <DependencyManager.h>
 
-#include "ui/OffscreenQmlSurface.h"
+#include "gl/OffscreenQmlSurface.h"
 #include "OffscreenQmlElement.h"
 
 class VrMenu;

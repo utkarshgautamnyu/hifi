@@ -22,8 +22,10 @@
 #include <DependencyManager.h>
 #include <ResourceCache.h>
 #include <model/TextureMap.h>
-#include <image/Image.h>
-#include <ktx/KTX.h>
+//CLIMAX_MERGE_START
+#include "../../../image/src/image/Image.h"
+#include "../../../ktx/src/ktx/KTX.h"
+//CLIMAX_MERGE_END
 
 #include "KTXCache.h"
 

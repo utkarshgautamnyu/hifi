@@ -25,7 +25,9 @@
 
 #include "Args.h"
 
-#include "model/Material.h"
+//CLIMAX_MERGE_START
+#include "../../../model/src/model/Material.h"
+//CLIMAX_MERGE_END
 #include "ShapePipeline.h"
 
 

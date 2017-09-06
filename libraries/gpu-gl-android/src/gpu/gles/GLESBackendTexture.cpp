@@ -24,7 +24,9 @@ using namespace gpu::gles;
 using GLESTexture = GLESBackend::GLESTexture;
 
 GLuint GLESTexture::allocate() {
-    Backend::incrementTextureGPUCount();
+	//CLIMAX_MERGE_START
+    //Backend::incrementTextureGPUCount();
+	//CLIMAX_MERGE_END
     GLuint result;
     glGenTextures(1, &result);
     return result;

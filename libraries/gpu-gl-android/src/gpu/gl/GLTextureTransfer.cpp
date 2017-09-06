@@ -52,7 +52,8 @@ GLTextureTransferHelper::~GLTextureTransferHelper() {
 void GLTextureTransferHelper::transferTexture(const gpu::TexturePointer& texturePointer) {
     GLTexture* object = Backend::getGPUObject<GLTexture>(*texturePointer);
 
-    Backend::incrementTextureGPUTransferCount();
+	//CLIMAX_MERGE_START
+    //Backend::incrementTextureGPUTransferCount();
     object->setSyncState(GLSyncState::Pending);
     Lock lock(_mutex);
     _pendingTextures.push_back(texturePointer);
@@ -182,7 +183,8 @@ bool GLTextureTransferHelper::process() {
         gltexture->_contentStamp = gltexture->_gpuObject.getDataStamp();
         gltexture->updateSize();
         gltexture->setSyncState(gpu::gl::GLSyncState::Transferred);
-        Backend::decrementTextureGPUTransferCount();
+		//CLIMAX_MERGE_START
+        //Backend::decrementTextureGPUTransferCount();
 #ifdef HAVE_NSIGHT
         // Mark the texture as transferred
         nvtxRangeEnd(_map[texture]);

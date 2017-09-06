@@ -65,7 +65,9 @@
 #include <AssetClient.h>
 #include <AssetUpload.h>
 #include <AutoUpdater.h>
-#include <Midi.h>
+//CLIMAX_MERGE_START
+#include "../../libraries/midi/src/Midi.h"
+//CLIMAX_MERGE_END
 #include <AudioInjectorManager.h>
 #include <AvatarBookmarks.h>
 #include <CursorManager.h>
@@ -106,7 +108,8 @@
 #include <OctreeSceneStats.h>
 #include <OffscreenUi.h>
 #include <gl/OffscreenGLCanvas.h>
-#include <ui/OffscreenQmlSurfaceCache.h>
+#include <gl/OffscreenQmlSurfaceCache.h>
+#include <ui/QmlWrapper.h>
 #include <PathUtils.h>
 #include <PerfStat.h>
 #include <PhysicsEngine.h>
@@ -131,7 +134,10 @@
 #ifndef ANDROID
 #include <steamworks-wrapper/SteamClient.h>
 #endif
-#include <TabletScriptingInterface.h>
+//CLIMAX_MERGE_START
+#include "../../libraries/ui/src/ui/TabletScriptingInterface.h"
+#include "../../libraries/ui/src/ui/ToolbarScriptingInterface.h"
+//CLIMAX_MERGE_END
 #include <Tooltip.h>
 #include <udt/PacketHeaders.h>
 #include <UserActivityLogger.h>
@@ -143,9 +149,10 @@
 #include <QmlWebWindowClass.h>
 #include <Preferences.h>
 #include <display-plugins/CompositorHelper.h>
-#include <trackers/EyeTracker.h>
-#include <avatars-renderer/ScriptAvatar.h>
-
+//CLIMAX_MERGE_START
+#include "../../libraries/trackers/src/trackers/EyeTracker.h"
+#include "../../libraries/avatars-renderer/src/avatars-renderer/ScriptAvatar.h"
+//CLIMAX_MERGE_END
 #include "AudioClient.h"
 #include "audio/AudioScope.h"
 #include "avatar/AvatarManager.h"
@@ -409,7 +416,7 @@ public:
             }
 
             if (message->message == WM_DEVICECHANGE) {
-                Midi::USBchanged();                // re-scan the MIDI bus
+                Midi::USBchanged();  __ANDROID_API_N__              // re-scan the MIDI bus
             }
         }
         return false;
@@ -2097,7 +2104,7 @@ void Application::initializeUi() {
     auto offscreenUi = DependencyManager::get<OffscreenUi>();
     offscreenUi->create(_glWidget->qglContext());
 
-    auto surfaceContext = offscreenUi->getSurfaceContext();
+    auto surfaceContext = offscreenUi->getRootContext();
 
     offscreenUi->setProxyWindow(_window->windowHandle());
     offscreenUi->setBaseUrl(QUrl::fromLocalFile(PathUtils::resourcesPath() + "/qml/"));

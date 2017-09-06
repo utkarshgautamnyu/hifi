@@ -17,8 +17,13 @@
 #include <controllers/InputDevice.h>
 #include <plugins/InputPlugin.h>
 #include <controllers/StandardControls.h>
+//CLIAMAX_MERGE_START
+#ifndef ANDROID
 #include <RenderArgs.h>
-#include <render/Scene.h>
+#else
+#include "../../../render/src/render/Args.h"
+#endif
+#include "../../../render/src/render/Scene.h"
 #include "../DaydreamPlugin.h"
 #include "DaydreamHelpers.h"
 

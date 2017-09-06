@@ -100,51 +100,53 @@ void DeferredLightingEffect::init() {
     loadLightProgram(deferred_light_vert, local_lights_shading_frag, true, _localLight, _localLightLocations);
     loadLightProgram(deferred_light_vert, local_lights_drawOutline_frag, true, _localLightOutline, _localLightOutlineLocations);
 
-    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
-    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
-    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
-    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
+	//CLIMAX_MERGE_START
+    //loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
+    //loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
+    //loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
+    //loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
 
     // Light Stage and clusters
-    _lightStage = std::make_shared<LightStage>();
+    //_lightStage = std::make_shared<LightStage>();
     
-    // Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
-    _allocatedLights.push_back(std::make_shared<model::Light>());
-    model::LightPointer lp = _allocatedLights[0];
-    lp->setType(model::Light::SUN);
-    lp->setDirection(glm::vec3(-1.0f));
-    lp->setColor(glm::vec3(1.0f));
-    lp->setIntensity(1.0f);
-    lp->setType(model::Light::SUN);
-    lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
+    //// Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
+    //_allocatedLights.push_back(std::make_shared<model::Light>());
+    //model::LightPointer lp = _allocatedLights[0];
+    //lp->setType(model::Light::SUN);
+    //lp->setDirection(glm::vec3(-1.0f));
+    //lp->setColor(glm::vec3(1.0f));
+    //lp->setIntensity(1.0f);
+    //lp->setType(model::Light::SUN);
+    //lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
 
     // Add the global light to the light stage (for later shadow rendering)
-    _globalLights.push_back(_lightStage->addLight(lp));
-    _lightStage->addShadow(_globalLights[0]);
+    //_globalLights.push_back(_lightStage->addLight(lp));
+    //_lightStage->addShadow(_globalLights[0]);
 
 
-    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
-    loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
-    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
-    loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
-*/
+    //loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, false, _pointLightBack, _pointLightLocations);
+    //loadLightVolumeProgram(deferred_light_point_vert, no_light_frag, true, _pointLightFront, _pointLightLocations);
+    //loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, false, _spotLightBack, _spotLightLocations);
+    //loadLightVolumeProgram(deferred_light_spot_vert, no_light_frag, true, _spotLightFront, _spotLightLocations);
+	
     // Light Stage and clusters
-    _lightStage = std::make_shared<LightStage>();
+    //_lightStage = std::make_shared<LightStage>();
     
-    // Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
-    _allocatedLights.push_back(std::make_shared<model::Light>());
-    model::LightPointer lp = _allocatedLights[0];
-    lp->setType(model::Light::SUN);
-    lp->setDirection(glm::vec3(-1.0f));
-    lp->setColor(glm::vec3(1.0f));
-    lp->setIntensity(1.0f);
-    lp->setType(model::Light::SUN);
-    lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
+    //// Allocate a global light representing the Global Directional light casting shadow (the sun) and the ambient light
+    //_allocatedLights.push_back(std::make_shared<model::Light>());
+    //model::LightPointer lp = _allocatedLights[0];
+    //lp->setType(model::Light::SUN);
+    //lp->setDirection(glm::vec3(-1.0f));
+    //lp->setColor(glm::vec3(1.0f));
+    //lp->setIntensity(1.0f);
+    //lp->setType(model::Light::SUN);
+    //lp->setAmbientSpherePreset(gpu::SphericalHarmonics::Preset::OLD_TOWN_SQUARE);
 
     // Add the global light to the light stage (for later shadow rendering)
-    _globalLights.push_back(_lightStage->addLight(lp));
-    _lightStage->addShadow(_globalLights[0]);
-
+    //_globalLights.push_back(_lightStage->addLight(lp));
+    //_lightStage->addShadow(_globalLights[0]);
+//CLIMAX_MERGE_END
+	
 }
 
 void DeferredLightingEffect::setupKeyLightBatch(const RenderArgs* args, gpu::Batch& batch, int lightBufferUnit, int ambientBufferUnit, int skyboxCubemapUnit) {
@@ -189,7 +191,7 @@ void DeferredLightingEffect::unsetKeyLightBatch(gpu::Batch& batch, int lightBuff
         batch.setResourceTexture(skyboxCubemapUnit, nullptr);
     }
 }
-/*
+
 static gpu::ShaderPointer makeLightProgram(const char* vertSource, const char* fragSource, LightLocationsPtr& locations) {
     auto VS = gpu::Shader::createVertex(std::string(vertSource));
     auto PS = gpu::Shader::createPixel(std::string(fragSource));
@@ -239,8 +241,8 @@ static gpu::ShaderPointer makeLightProgram(const char* vertSource, const char* f
     locations->shadowTransformBuffer = program->getUniformBuffers().findLocation("shadowTransformBuffer");
 
     return program;
-}*/
-/*
+}
+
 static void loadLightProgram(const char* vertSource, const char* fragSource, bool lightVolume, gpu::PipelinePointer& pipeline, LightLocationsPtr& locations) {
     qDebug() << "[LIGHT] loadLightProgram";
     gpu::ShaderPointer program = makeLightProgram(vertSource, fragSource, locations);

@@ -33,7 +33,9 @@
 #include <SettingHandle.h>
 #include <UsersScriptingInterface.h>
 #include <UUID.h>
-#include <avatars-renderer/OtherAvatar.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/OtherAvatar.h"
+//CLIMAX_MERGE_END
 
 #include "Application.h"
 #include "AvatarManager.h"
