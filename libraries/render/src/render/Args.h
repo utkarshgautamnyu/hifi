@@ -17,7 +17,9 @@
 #include <GLMHelpers.h>
 #include <ViewFrustum.h>
 
-#include <gpu/Forward.h>
+//CLIMAX_MERGE_START
+#include "../../../gpu/src/gpu/Forward.h"
+//CLIMAX_MERGE_END
 #include "Forward.h"
 
 

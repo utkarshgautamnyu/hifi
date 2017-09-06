@@ -65,7 +65,8 @@ void FileScriptingInterface::runUnzip(QString path, QUrl url, bool autoAdd, bool
 }
 
 QStringList FileScriptingInterface::unzipFile(QString path, QString tempDir) {
-
+//CLIMAX_MERGE_START	
+#ifndef ANDROID
     QDir dir(path);
     QString dirName = dir.path();
     qCDebug(scriptengine) << "Directory to unzip: " << dirName;
@@ -80,7 +81,10 @@ QStringList FileScriptingInterface::unzipFile(QString path, QString tempDir) {
         qCDebug(scriptengine) << "Extraction failed";
         return list;
     }
-
+#else
+    return QStringList();
+#endif
+	//CLIAMX_MERGE_END
 }
 
 // fix to check that we are only referring to a temporary directory

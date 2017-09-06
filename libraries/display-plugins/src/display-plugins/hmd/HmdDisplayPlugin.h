@@ -13,10 +13,10 @@
 
 #include <QtGlobal>
 #include <Transform.h>
-
-#include <gpu/Format.h>
-#include <gpu/Stream.h>
-
+//CLIMAX_MERGE_START
+#include "../../../../gpu/src/gpu/Format.h"
+#include "../../../../gpu/src/gpu/Stream.h"
+//CLIMAX_MERGE_END
 #include "../CompositorHelper.h"
 #include "../OpenGLDisplayPlugin.h"
 

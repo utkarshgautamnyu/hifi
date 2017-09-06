@@ -8,7 +8,9 @@
 
 #include "MySkeletonModel.h"
 
-#include <avatars-renderer/Avatar.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/Avatar.h"
+//CLIMAX_MERGE_END
 
 #include "Application.h"
 #include "InterfaceLogging.h"

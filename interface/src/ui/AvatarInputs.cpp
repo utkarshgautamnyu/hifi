@@ -11,7 +11,9 @@
 
 #include <AudioClient.h>
 #include <SettingHandle.h>
-#include <trackers/FaceTracker.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/trackers/src/trackers/FaceTracker.h"
+//CLIMAX_MERGE_END
 
 #include "Application.h"
 #include "Menu.h"

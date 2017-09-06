@@ -32,8 +32,9 @@
 
 #include <gpu/Batch.h>
 
-#include <image/Image.h>
-
+//CLIMAX_MERGE_START
+#include "../../../image/src/image/Image.h"
+//CLIMAX_MERGE_END
 #include <NumericalConstants.h>
 #include <shared/NsightHelpers.h>
 

@@ -9,7 +9,10 @@
 #ifndef hifi_MySkeletonModel_h
 #define hifi_MySkeletonModel_h
 
-#include <avatars-renderer/SkeletonModel.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/avatars-renderer/src/avatars-renderer/SkeletonModel.h"
+//CLIMAX_MERGE_END
+
 #include "MyAvatar.h"
 
 /// A skeleton loaded from a model.

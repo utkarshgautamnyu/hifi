@@ -123,14 +123,17 @@ float GLTexture::getMemoryPressure() {
     }
 
     // Return the consumed texture memory divided by the available texture memory.
-    auto consumedGpuMemory = Context::getTextureGPUMemoryUsage() - Context::getTextureGPUFramebufferMemoryUsage();
-    float memoryPressure = (float)consumedGpuMemory / (float)availableTextureMemory;
-    static Context::Size lastConsumedGpuMemory = 0;
-    if (memoryPressure > 1.0f && lastConsumedGpuMemory != consumedGpuMemory) {
-        lastConsumedGpuMemory = consumedGpuMemory;
-        qCDebug(gpugllogging) << "Exceeded max allowed texture memory: " << consumedGpuMemory << " / " << availableTextureMemory;
-    }
-    return memoryPressure;
+    //CLIMAX_MERGE_START
+	//auto consumedGpuMemory = Context::getTextureGPUMemoryUsage() - Context::getTextureGPUFramebufferMemoryUsage();
+    //float memoryPressure = (float)consumedGpuMemory / (float)availableTextureMemory;
+    //static Context::Size lastConsumedGpuMemory = 0;
+    //if (memoryPressure > 1.0f && lastConsumedGpuMemory != consumedGpuMemory) {
+    //    lastConsumedGpuMemory = consumedGpuMemory;
+    //    qCDebug(gpugllogging) << "Exceeded max allowed texture memory: " << consumedGpuMemory << " / " << availableTextureMemory;
+    //}
+    //return memoryPressure;
+	return 0;
+
 }
 
 
@@ -150,8 +153,10 @@ GLTexture::GLTexture(const std::weak_ptr<GLBackend>& backend, const Texture& tex
     //qDebug() << "GLTexture::GLTexture building GLTexture with _internalFormat" << _internalFormat;
     auto strongBackend = _backend.lock();
     strongBackend->recycle();
-    Backend::incrementTextureGPUCount();
-    Backend::updateTextureGPUVirtualMemoryUsage(0, _virtualSize);
+	//CLIMAX_MERGE_START
+    //Backend::incrementTextureGPUCount();
+    //Backend::updateTextureGPUVirtualMemoryUsage(0, _virtualSize);
+	//CLIMAX_MERGE_END
     Backend::setGPUObject(texture, this);
 }
 
@@ -195,11 +200,13 @@ GLTexture::~GLTexture() {
             backend->releaseTexture(_id, _size);
         }
 
-        if (!_external && !_transferrable) {
-            Backend::updateTextureGPUFramebufferMemoryUsage(_size, 0);
-        }
+		////CLIMAX_MERGE_START
+        //if (!_external && !_transferrable) {
+        //    Backend::updateTextureGPUFramebufferMemoryUsage(_size, 0);
+        //}
     }
-    Backend::updateTextureGPUVirtualMemoryUsage(_virtualSize, 0);
+    //Backend::updateTextureGPUVirtualMemoryUsage(_virtualSize, 0);
+	//CLIMAX_MERGE_END
 }
 
 void GLTexture::createTexture() {
@@ -234,10 +241,11 @@ void GLTexture::withPreservedTexture(std::function<void()> f) const {
 }
 
 void GLTexture::setSize(GLuint size) const {
-    if (!_external && !_transferrable) {
-        Backend::updateTextureGPUFramebufferMemoryUsage(_size, size);
-    }
-    Backend::updateTextureGPUMemoryUsage(_size, size);
+    ////CLIMAX_MERGE_START
+	//if (!_external && !_transferrable) {
+	//    Backend::updateTextureGPUFramebufferMemoryUsage(_size, 0);
+	//}
+    //Backend::updateTextureGPUMemoryUsage(_size, size);
     const_cast<GLuint&>(_size) = size;
 }
 

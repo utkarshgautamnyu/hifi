@@ -8,7 +8,7 @@
 
 #include <string.h>
 #include <assert.h>
-
+#include <cstdlib>
 #include "AudioDynamics.h"
 #include "AudioGate.h"
 
@@ -417,7 +417,7 @@ void GateMono<N>::process(int16_t* input, int16_t* output, int numFrames) {
         _dc.process(x);
 
         // peak detect
-        int32_t peak = abs(x);
+        int32_t peak = std::abs(x);
 
         // convert to log2 domain
         peak = fixlog2(peak);

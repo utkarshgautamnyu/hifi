@@ -25,8 +25,8 @@
 #include <GeometryCache.h>
 #include <GeometryUtil.h>
 #include <scripting/HMDScriptingInterface.h>
-#include <ui/OffscreenQmlSurface.h>
-#include <ui/OffscreenQmlSurfaceCache.h>
+#include <gl/OffscreenQmlSurface.h>
+#include <gl/OffscreenQmlSurfaceCache.h>
 #include <ui/TabletScriptingInterface.h>
 #include <PathUtils.h>
 #include <RegisteredMetaTypes.h>

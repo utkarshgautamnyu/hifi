@@ -93,7 +93,7 @@ QObject* OffscreenUi::getFlags() {
 
 void OffscreenUi::create(QOpenGLContext* context) {
     OffscreenQmlSurface::create(context);
-    auto myContext = getSurfaceContext();
+    auto myContext = getRootContext();
 
     myContext->setContextProperty("OffscreenUi", this);
     myContext->setContextProperty("offscreenFlags", offscreenFlags = new OffscreenFlags());
@@ -549,9 +549,9 @@ void OffscreenUi::createDesktop(const QUrl& url) {
     }
 
 #ifdef DEBUG
-    getSurfaceContext()->setContextProperty("DebugQML", QVariant(true));
+    getRootContext()->setContextProperty("DebugQML", QVariant(true));
 #else 
-    getSurfaceContext()->setContextProperty("DebugQML", QVariant(false));
+    getRootContext()->setContextProperty("DebugQML", QVariant(false));
 #endif
 #ifdef ANDROID
     _desktop = static_cast<QQuickItem*>(load(url));
@@ -559,7 +559,7 @@ void OffscreenUi::createDesktop(const QUrl& url) {
     _desktop = dynamic_cast<QQuickItem*>(load(url));
 #endif
     Q_ASSERT(_desktop);
-    getSurfaceContext()->setContextProperty("desktop", _desktop);
+    getRootContext()->setContextProperty("desktop", _desktop);
 
     _toolWindow = _desktop->findChild<QQuickItem*>("ToolWindow");
 

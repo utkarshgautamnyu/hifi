@@ -13,7 +13,7 @@
 #include <QtCore/QThread>
 #include <QtCore/QCommandLineParser>
 
-#include <image/Image.h>
+#include <Image.h>
 #include <SettingInterface.h>
 
 #include "ui/OvenMainWindow.h"

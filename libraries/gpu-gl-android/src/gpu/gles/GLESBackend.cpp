@@ -18,6 +18,8 @@ Q_LOGGING_CATEGORY(gpugleslogging, "hifi.gpu.gles")
 using namespace gpu;
 using namespace gpu::gles;
 
+const std::string GLESBackend::GLES_VERSION { "GLES" };
+
 void GLESBackend::do_draw(const Batch& batch, size_t paramOffset) {
     Primitive primitiveType = (Primitive)batch._params[paramOffset + 2]._uint;
     GLenum mode = gl::PRIMITIVE_TO_GL[primitiveType];

@@ -45,7 +45,9 @@
 #include <recording/Clip.h>
 #include <recording/Frame.h>
 #include <RecordingScriptingInterface.h>
-#include <trackers/FaceTracker.h>
+//CLIMAX_MERGE_START
+#include "../../../libraries/trackers/src/trackers/FaceTracker.h"
+//CLIMAX_MERGE_END
 
 #include "MyHead.h"
 #include "MySkeletonModel.h"

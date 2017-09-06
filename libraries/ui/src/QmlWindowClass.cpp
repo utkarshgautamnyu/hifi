@@ -109,7 +109,7 @@ void QmlWindowClass::initQml(QVariantMap properties) {
     } else {
 #endif
         // Build the event bridge and wrapper on the main thread
-        offscreenUi->loadInNewContext(qmlSource(), [&](QQmlContext* context, QObject* object) {
+        offscreenUi->load(qmlSource(), [&](QQmlContext* context, QObject* object) {
             _qmlWindow = object;
             context->setContextProperty(EVENT_BRIDGE_PROPERTY, this);
             context->engine()->setObjectOwnership(this, QQmlEngine::CppOwnership);

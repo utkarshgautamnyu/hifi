@@ -23,7 +23,9 @@
 #include <GLMHelpers.h>
 #include <RegisteredMetaTypes.h>
 #include <shared/Bilateral.h>
-#include <gpu/Forward.h>
+//CLIMAX_MERGE_START
+#include "../../../gpu/src/gpu/Forward.h"
+//CLIMAX_MERGE_END
 #include "Plugin.h"
 
 class QOpenGLFramebufferObject;

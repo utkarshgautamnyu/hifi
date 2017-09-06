@@ -190,27 +190,6 @@ void PluginManager::loadDisplayPlugins(DisplayPlugin* pool[]) {
     }
 }
 
-void PluginManager::loadInputPlugins(InputPluginList pool) {
-    for (auto& plugin : pool) {
-        if (plugin->isSupported()) {
-            plugin->init();
-            _inputPlugins.push_back(plugin);
-            qInfo() << "Input Plugin supported " << plugin->getName();
-        }
-    }
-}
-
-void PluginManager::loadInputPlugins(InputPlugin *pool[]) {
-    for (int i = 0; pool[i]; ++i) {
-        InputPlugin * plugin = pool[i];
-        if (plugin->isSupported()) {
-            plugin->init();
-            _inputPlugins.push_back(InputPluginPointer(plugin));
-            qInfo() << "Input Plugin supported " << i;
-        }
-    }
-}
-
 DisplayPluginList getDisplayPlugins() {
     qInfo() << __FUNCTION__ << "line:" << __LINE__;
     return PluginManager::getInstance()->_displayPlugins;

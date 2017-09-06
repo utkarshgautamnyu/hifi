@@ -13,6 +13,11 @@ using namespace gpu;
 using namespace gpu::gl;
 
 GLBuffer::~GLBuffer() {
+	//CLIMAX_MERGE_START
+	Backend::bufferCount.decrement();
+    Backend::bufferGPUMemSize.update(_size, 0);
+	//CLIMAX_MERGE_END
+	
     if (_id) {
         auto backend = _backend.lock();
         if (backend) {
@@ -26,7 +31,11 @@ GLBuffer::GLBuffer(const std::weak_ptr<GLBackend>& backend, const Buffer& buffer
     _size((GLuint)buffer._renderSysmem.getSize()),
     _stamp(buffer._renderSysmem.getStamp())
 {
-    Backend::incrementBufferGPUCount();
-    Backend::updateBufferGPUMemoryUsage(0, _size);
+	//CLIMAX_MERGE_START
+	Backend::bufferCount.increment();
+    Backend::bufferGPUMemSize.update(0, _size);
+    //Backend::incrementBufferGPUCount();
+    //Backend::updateBufferGPUMemoryUsage(0, _size);
+	//CLIMAX_MERGE_END
 }
 

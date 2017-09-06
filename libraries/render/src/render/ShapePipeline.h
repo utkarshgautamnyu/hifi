@@ -13,9 +13,9 @@
 #define hifi_render_ShapePipeline_h
 
 #include <unordered_set>
-
-#include <gpu/Batch.h>
-
+//CLIMAX_MERGE_START
+#include "../../../gpu/src/gpu/Batch.h"
+//CLIMAX_MERGE_END
 #include "Args.h"
 
 namespace render {
