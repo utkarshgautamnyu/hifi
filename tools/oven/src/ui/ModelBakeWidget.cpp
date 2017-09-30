@@ -23,7 +23,7 @@
 
 #include "../Oven.h"
 #include "OvenMainWindow.h"
-
+#include "OBJBaker.h"
 #include "ModelBakeWidget.h"
 
 static const auto EXPORT_DIR_SETTING_KEY = "model_export_directory";
@@ -114,7 +114,7 @@ void ModelBakeWidget::chooseFileButtonClicked() {
         startDir = QDir::homePath();
     }
 
-    auto selectedFiles = QFileDialog::getOpenFileNames(this, "Choose Model", startDir, "Models (*.fbx)");
+    auto selectedFiles = QFileDialog::getOpenFileNames(this, "Choose Model", startDir, "Models (*.fbx *.obj)");
 
     if (!selectedFiles.isEmpty()) {
         // set the contents of the model file text box to be the path to the selected file
@@ -206,11 +206,13 @@ void ModelBakeWidget::bakeButtonClicked() {
         originalOutputDirectory.mkdir(".");
 
         // everything seems to be in place, kick off a bake for this model now
-        auto baker = std::unique_ptr<FBXBaker> {
+       /* auto baker = std::unique_ptr<FBXBaker> {
             new FBXBaker(modelToBakeURL, []() -> QThread* {
                 return qApp->getNextWorkerThread();
             }, bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath())
-        };
+        };*/
+        auto baker = std::unique_ptr<Baker>{ new OBJBaker(modelToBakeURL, []() -> QThread* { return qApp->getNextWorkerThread(); },bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath()) };
+        //_baker->moveToThread(qApp->getNextWorkerThread());
 
         // move the baker to the FBX baker thread
         baker->moveToThread(qApp->getNextWorkerThread());
