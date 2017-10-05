@@ -773,7 +773,7 @@ void FBXBaker::exportScene() {
     _bakedFBXFilePath = _bakedOutputDir + "/" + bakedFilename;
 
     auto fbxData = FBXWriter::encodeFBX(_rootNode);
-
+    qCDebug(model_baking) << "data" << fbxData;
     QFile bakedFile(_bakedFBXFilePath);
 
     if (!bakedFile.open(QIODevice::WriteOnly)) {

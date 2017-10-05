@@ -18,7 +18,6 @@
 #include "BakerCLI.h"
 #include "FBXBaker.h"
 #include "TextureBaker.h"
-#include "OBJBaker.h"
 
 BakerCLI::BakerCLI(Oven* parent) : QObject(parent) {
 }
@@ -30,12 +29,10 @@ void BakerCLI::bakeFile(QUrl inputUrl, const QString outputPath) {
         inputUrl.setScheme("file");
     }
 
-    static const QString MODEL_EXTENSION_FBX = ".fbx";
-    static const QString MODEL_EXTENSION_OBJ = ".obj";
-    
+    static const QString MODEL_EXTENSION{ ".fbx" };
+
     // check what kind of baker we should be creating
-    bool isFBX = inputUrl.toDisplayString().endsWith(MODEL_EXTENSION_FBX, Qt::CaseInsensitive);
-    bool isOBJ = inputUrl.toDisplayString().endsWith(MODEL_EXTENSION_OBJ, Qt::CaseInsensitive);
+    bool isFBX = inputUrl.toDisplayString().endsWith(MODEL_EXTENSION, Qt::CaseInsensitive);
     bool isSupportedImage = false;
 
     for (QByteArray format : QImageReader::supportedImageFormats()) {
@@ -44,13 +41,10 @@ void BakerCLI::bakeFile(QUrl inputUrl, const QString outputPath) {
 
     // create our appropiate baker
     if (isFBX) {
-        _baker = std::unique_ptr<Baker> { new FBXBaker(inputUrl, []() -> QThread* { return qApp->getNextWorkerThread(); }, outputPath) };
-        _baker->moveToThread(qApp->getNextWorkerThread());
-    } else if (isOBJ) {
-        _baker = std::unique_ptr<Baker>{ new OBJBaker(inputUrl, []() -> QThread* { return qApp->getNextWorkerThread(); }, outputPath) };
+        _baker = std::unique_ptr<Baker>{ new FBXBaker(inputUrl, []() -> QThread* { return qApp->getNextWorkerThread(); }, outputPath) };
         _baker->moveToThread(qApp->getNextWorkerThread());
     } else if (isSupportedImage) {
-        _baker = std::unique_ptr<Baker> { new TextureBaker(inputUrl, image::TextureUsage::CUBE_TEXTURE, outputPath) };
+        _baker = std::unique_ptr<Baker>{ new TextureBaker(inputUrl, image::TextureUsage::CUBE_TEXTURE, outputPath) };
         _baker->moveToThread(qApp->getNextWorkerThread());
     } else {
         qCDebug(model_baking) << "Failed to determine baker type for file" << inputUrl;

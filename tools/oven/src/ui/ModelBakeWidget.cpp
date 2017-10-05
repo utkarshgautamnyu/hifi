@@ -204,24 +204,34 @@ void ModelBakeWidget::bakeButtonClicked() {
         
         bakedOutputDirectory.mkdir(".");
         originalOutputDirectory.mkdir(".");
-
+        
         // everything seems to be in place, kick off a bake for this model now
-       /* auto baker = std::unique_ptr<FBXBaker> {
-            new FBXBaker(modelToBakeURL, []() -> QThread* {
-                return qApp->getNextWorkerThread();
-            }, bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath())
-        };*/
-        auto baker = std::unique_ptr<Baker>{ new OBJBaker(modelToBakeURL, []() -> QThread* { return qApp->getNextWorkerThread(); },bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath()) };
-        //_baker->moveToThread(qApp->getNextWorkerThread());
+        if (modelToBakeURL.fileName().endsWith(".fbx")) {
+            _baker = std::unique_ptr<FBXBaker> {
+                new FBXBaker(modelToBakeURL, []() -> QThread* {
+                    return qApp->getNextWorkerThread();
+                }, bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath())
+            };
 
+            isFBX = true;
+        } else if (modelToBakeURL.fileName().endsWith(".obj")) {
+            _baker = std::unique_ptr<OBJBaker> { 
+                new OBJBaker(modelToBakeURL, []() -> QThread* { 
+                    return qApp->getNextWorkerThread(); 
+                }, bakedOutputDirectory.absolutePath(), originalOutputDirectory.absolutePath())
+            };
+
+            isOBJ = true;
+        }
+                
         // move the baker to the FBX baker thread
-        baker->moveToThread(qApp->getNextWorkerThread());
+        _baker->moveToThread(qApp->getNextWorkerThread());
 
         // invoke the bake method on the baker thread
-        QMetaObject::invokeMethod(baker.get(), "bake");
+        QMetaObject::invokeMethod(_baker.get(), "bake");
 
         // make sure we hear about the results of this baker when it is done
-        connect(baker.get(), &FBXBaker::finished, this, &ModelBakeWidget::handleFinishedBaker);
+        connect(_baker.get(), &Baker::finished, this, &ModelBakeWidget::handleFinishedBaker);
 
         // add a pending row to the results window to show that this bake is in process
         auto resultsWindow = qApp->getMainWindow()->showResultsWindow();
@@ -229,32 +239,37 @@ void ModelBakeWidget::bakeButtonClicked() {
 
         // keep a unique_ptr to this baker
         // and remember the row that represents it in the results table
-        _bakers.emplace_back(std::move(baker), resultsRow);
+        _bakers.emplace_back(std::move(_baker), resultsRow);
     }
 }
 
 void ModelBakeWidget::handleFinishedBaker() {
-    if (auto baker = qobject_cast<FBXBaker*>(sender())) {
-        // add the results of this bake to the results window
-        auto it = std::find_if(_bakers.begin(), _bakers.end(), [baker](const BakerRowPair& value) {
-            return value.first.get() == baker;
-        });
+    Baker* baker;
+    if (isFBX) {
+        baker = qobject_cast<FBXBaker*>(sender());
+    } else if (isOBJ) {
+        baker = qobject_cast<OBJBaker*>(sender());
+    }
+    
+    // add the results of this bake to the results window
+    auto it = std::find_if(_bakers.begin(), _bakers.end(), [baker](const BakerRowPair& value) {
+        return value.first.get() == baker;
+    });
 
-        for (auto& file : baker->getOutputFiles()) {
-            qDebug() << "Baked file: " << file;
+    for (auto& file : baker->getOutputFiles()) {
+        qDebug() << "Baked file: " << file;
+    }
+
+    if (it != _bakers.end()) {
+        auto resultRow = it->second;
+        auto resultsWindow = qApp->getMainWindow()->showResultsWindow();
+
+        if (baker->hasErrors()) {
+            resultsWindow->changeStatusForRow(resultRow, baker->getErrors().join("\n"));
+        } else {
+            resultsWindow->changeStatusForRow(resultRow, "Success");
         }
 
-        if (it != _bakers.end()) {
-            auto resultRow = it->second;
-            auto resultsWindow = qApp->getMainWindow()->showResultsWindow();
-
-            if (baker->hasErrors()) {
-                resultsWindow->changeStatusForRow(resultRow, baker->getErrors().join("\n"));
-            } else {
-                resultsWindow->changeStatusForRow(resultRow, "Success");
-            }
-
-            _bakers.erase(it);
-        }
+        _bakers.erase(it);
     }
 }

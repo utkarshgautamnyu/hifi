@@ -536,6 +536,7 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
 
         QMap<QString, int> materialMeshIdMap;
         QVector<FBXMeshPart> fbxMeshParts;
+        
         for (int i = 0, meshPartCount = 0; i < mesh.parts.count(); i++, meshPartCount++) {
             FBXMeshPart& meshPart = mesh.parts[i];
             FaceGroup faceGroup = faceGroups[meshPartCount];
@@ -591,7 +592,6 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
             // Now that each mesh has been created with its own unique material mappings, fill them with data (vertex data is duplicated, face data is not).
             foreach(OBJFace face, faceGroup) {
                 FBXMeshPart& meshPart = mesh.parts[materialMeshIdMap[face.materialName]];
-
                 glm::vec3 v0 = checked_at(vertices, face.vertexIndices[0]);
                 glm::vec3 v1 = checked_at(vertices, face.vertexIndices[1]);
                 glm::vec3 v2 = checked_at(vertices, face.vertexIndices[2]);
@@ -751,6 +751,7 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
             modelMaterial->setOpacity(fbxMaterial.opacity);
         }
     }
+
 
     return geometryPtr;
 }

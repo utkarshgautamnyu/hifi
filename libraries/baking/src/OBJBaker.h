@@ -21,7 +21,7 @@
 
 #include "Baker.h"
 #include "TextureBaker.h"
-
+#include <FBX.h>
 #include "ModelBakingLoggingCategory.h"
 
 using TextureBakerThreadGetter = std::function<QThread*()>;
@@ -47,7 +47,7 @@ private slots:
     //void handleAbortedTexture();
 
 private:
-    void setupOutputFolder();
+    //void setupOutputFolder();
     void loadOBJ();
     
     QUrl _objURL;
@@ -56,9 +56,12 @@ private:
     QString _originalOutputDir;
     QDir _tempDir;
     QString _originalOBJFilePath;
-
+    
     TextureBakerThreadGetter _textureThreadGetter;
     QMultiHash<QUrl, QSharedPointer<TextureBaker>> _bakingTextures;
+
+public:
+    void createFBXNodeTree(FBXNode* objRoot, FBXNode* dracoNode);
 
 
 };

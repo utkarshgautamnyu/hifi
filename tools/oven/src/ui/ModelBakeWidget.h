@@ -17,6 +17,7 @@
 #include <SettingHandle.h>
 
 #include <FBXBaker.h>
+#include <OBJBaker.h>
 
 #include "BakeWidget.h"
 
@@ -28,6 +29,10 @@ class ModelBakeWidget : public BakeWidget {
 
 public:
     ModelBakeWidget(QWidget* parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags());
+    
+    bool isOBJ = false;
+    bool isFBX = false;
+
 
 private slots:
     void chooseFileButtonClicked();
@@ -46,6 +51,8 @@ private:
 
     Setting::Handle<QString> _exportDirectory;
     Setting::Handle<QString> _modelStartDirectory;
+
+    std::unique_ptr<Baker> _baker;
 };
 
 #endif // hifi_ModelBakeWidget_h

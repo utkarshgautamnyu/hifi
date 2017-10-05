@@ -22,6 +22,9 @@
 #include "OBJBaker.h"
 #include "ModelBakingLoggingCategory.h"
 #include "TextureBaker.h"
+#include "OBJReader.h"
+#include "ModelBaker.h"
+#include "FBXWriter.h"
 
 OBJBaker::OBJBaker(const QUrl& objURL, TextureBakerThreadGetter textureThreadGetter,
                    const QString& bakedOutputDir, const QString& originalOutputDir) :
@@ -58,37 +61,10 @@ void OBJBaker::bake() {
     qDebug() << "Made temporary dir " << _tempDir;
     qDebug() << "Origin file path: " << _originalOBJFilePath;
 
-    // setup the output folder for the results of this bake
-    setupOutputFolder();
-
-    if (shouldStop()) {
-        return;
-    }
-
     connect(this, &OBJBaker::OBJLoaded, this, &OBJBaker::startBake);
 
     // make a local copy of the obj file
     loadOBJ();
-}
-
-void OBJBaker::setupOutputFolder() {
-    // make sure there isn't already an output directory using the same name
-    if (QDir(_bakedOutputDir).exists()) {
-        qWarning() << "Output path" << _bakedOutputDir << "already exists. Continuing.";
-    } else {
-        qCDebug(model_baking) << "Creating obj output folder" << _bakedOutputDir;
-
-        // attempt to make the output folder
-        if (!QDir().mkpath(_bakedOutputDir)) {
-            handleError("Failed to create obj output folder " + _bakedOutputDir);
-            return;
-        }
-        // attempt to make the output folder
-        if (!QDir().mkpath(_originalOutputDir)) {
-            handleError("Failed to create obj output folder " + _bakedOutputDir);
-            return;
-        }
-    }
 }
 
 void OBJBaker::loadOBJ() {
@@ -123,15 +99,15 @@ void OBJBaker::loadOBJ() {
 
         // setup the request to follow re-directs and always hit the network
         networkRequest.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
-        networkRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
-        networkRequest.setHeader(QNetworkRequest::UserAgentHeader, HIGH_FIDELITY_USER_AGENT);
+networkRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+networkRequest.setHeader(QNetworkRequest::UserAgentHeader, HIGH_FIDELITY_USER_AGENT);
 
-        networkRequest.setUrl(_objURL);
+networkRequest.setUrl(_objURL);
 
-        qCDebug(model_baking) << "Downloading" << _objURL;
-        auto networkReply = networkAccessManager.get(networkRequest);
+qCDebug(model_baking) << "Downloading" << _objURL;
+auto networkReply = networkAccessManager.get(networkRequest);
 
-        connect(networkReply, &QNetworkReply::finished, this, &OBJBaker::handleOBJNetworkReply);
+connect(networkReply, &QNetworkReply::finished, this, &OBJBaker::handleOBJNetworkReply);
     }
 }
 
@@ -173,7 +149,135 @@ void OBJBaker::handleOBJNetworkReply() {
 
 
 void OBJBaker::startBake() {
-    qCDebug(model_baking) << "OBJ Baking";
+    // Read the OBJ
+    QFile objFile(_originalOBJFilePath);
+    if (!objFile.open(QIODevice::ReadOnly)) {
+        handleError("Error opening " + _originalOBJFilePath + " for reading");
+        return;
+    }
 
+    QByteArray objData = objFile.readAll();
+
+    bool combineParts = false;
+    OBJReader reader;
+    FBXGeometry* geometry = reader.readOBJ(objData, QVariantHash(), combineParts);
+    
+    
+    
+    FBXNode objRoot;
+    FBXNode dracoNode;
+
+    dracoNode = ModelBaker::compressMesh(geometry->meshes[0]);
+    
+    createFBXNodeTree(&objRoot, &dracoNode);
+
+    auto encodedFBX = FBXWriter::encodeFBX(objRoot);
+
+    qCDebug(model_baking) << "encoded FBX" << encodedFBX;
+    auto fileName = _objURL.fileName();
+    auto baseName = fileName.left(fileName.lastIndexOf('.'));
+    auto bakedFilename = baseName + ".baked.fbx";
+
+    _bakedOBJFilePath = _bakedOutputDir + "/" + bakedFilename;
+
+    QFile bakedFile;
+    bakedFile.setFileName(_bakedOBJFilePath);
+    if (!bakedFile.open(QIODevice::WriteOnly)) {
+        handleError("Error opening " + _bakedOBJFilePath + " for writing");
+        return;
+    }
+
+    bakedFile.write(encodedFBX);
+
+    // Export successful
+    _outputFiles.push_back(_bakedOBJFilePath);
+    qCDebug(model_baking) << "Exported" << _objURL << "with re-written paths to" << _bakedOBJFilePath;
+    
     emit finished();
+
+}
+
+void OBJBaker::createFBXNodeTree(FBXNode* objRoot, FBXNode* dracoNode) {
+    
+    FBXNode header;
+    FBXNode FileId;
+    FBXNode creationTime;
+    FBXNode creator;
+    FBXNode globalSettings;
+    FBXNode documents;
+    FBXNode references;
+    FBXNode definitions;
+    FBXNode objectNode;
+    FBXNode connections;
+    FBXNode takes;
+
+    header.name = "FBXHeaderExtension";
+    FileId.name = "FileId";
+    creationTime.name = "CreationTime";
+    creator.name = "Creator";
+    globalSettings.name = "GlobalSettings";
+    documents.name = "Documents";
+    references.name = "References";
+    definitions.name = "Definitions";
+    objectNode.name = "Objects";
+    connections.name = "Connections";
+    takes.name = "Takes";
+
+    QByteArray property0 = "UnitScaleFactor";
+    auto prop0 = QVariant::fromValue(QByteArray(property0.data(), (int)property0.size()));
+    QByteArray property1 = "double";
+    auto prop1 = QVariant::fromValue(QByteArray(property1.data(), (int)property1.size()));
+    QByteArray property2 = "Number";
+    auto prop2 = QVariant::fromValue(QByteArray(property2.data(), (int)property2.size()));
+    QByteArray property3 = "";
+    auto prop3 = QVariant::fromValue(QByteArray(property3.data(), (int)property3.size()));
+    double d = 1;
+    QVariant prop4 = d;
+    
+    FBXNode p;
+    p.name = "P";
+    p.properties = {prop0, prop1, prop2, prop3, prop4};
+
+    FBXNode properties70;
+    properties70.name = "Properties70";
+    properties70.children = { p };
+
+    globalSettings.children = { properties70 };
+
+    FBXNode geometryNode;
+    geometryNode.name = "Geometry";
+    QVariant val = 837754154LL;
+    QByteArray buffer = "Cube  Geometry";
+    auto value = QVariant::fromValue(QByteArray(buffer.data(), (int)buffer.size()));
+    QByteArray buffer1 = "Mesh";
+    auto value1 = QVariant::fromValue(QByteArray(buffer1.data(), (int)buffer1.size()));
+    geometryNode.properties = { val, value, value1 };
+
+    FBXNode modelNode;
+    modelNode.name = "Model";
+    QVariant val2 = 579498249LL;
+    QByteArray buffer2 = "Cube  Model";
+    auto value2 = QVariant::fromValue(QByteArray(buffer2.data(), (int)buffer2.size()));
+    QByteArray buffer3 = "Mesh";
+    auto value3 = QVariant::fromValue(QByteArray(buffer3.data(), (int)buffer3.size()));
+   modelNode.properties = { val2, value2, value3 };
+
+    FBXNode materialNode;
+    materialNode.name = "Material";
+    QVariant val3 = 51114185LL;
+    QByteArray buffer4 = "Material  Material";
+    auto value4 = QVariant::fromValue(QByteArray(buffer4.data(), (int)buffer4.size()));
+    QByteArray buffer5 = "Mesh";
+    auto value5 = QVariant::fromValue(QByteArray(buffer5.data(), (int)buffer5.size()));
+    materialNode.properties = { val3, value4, value5 };
+    
+
+    //objRoot.children = { header,FileId, creationTime, creator, globalSettings, documents, references, definitions, objectNode, connections, takes };
+       
+    objRoot->children = { globalSettings, objectNode};
+    objRoot->children[1].children = { geometryNode, modelNode, materialNode };
+    objRoot->children[1].children[0].children = { *dracoNode };
+    
+
+
 }

@@ -601,12 +601,11 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
                     } else { // object.properties.at(2) == "Shape"
                         ExtractedBlendshape extracted = { getID(object.properties), extractBlendshape(object) };
                         blendshapes.append(extracted);
-                    }
+                    } 
                 } else if (object.name == "Model") {
                     QString name = getName(object.properties);
                     QString id = getID(object.properties);
                     modelIDsToNames.insert(id, name);
-
                     QString modelname = name.toLower();
                     if (modelname.startsWith("hifi")) {
                         hifiGlobalNodeID = id;
@@ -727,13 +726,10 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
 
                                     } else if (childProperty == SCALING_PIVOT) {
                                         scalePivot = getVec3(property.properties, index);
-
                                     } else if (childProperty == LCL_SCALING) {
                                         scale = getVec3(property.properties, index);
-
                                     } else if (childProperty == SCALING_OFFSET) {
                                         scaleOffset = getVec3(property.properties, index);
-
                                     // NOTE: these rotation limits are stored in degrees (NOT radians)
                                     } else if (childProperty == ROTATION_MIN) {
                                         rotationMin = getVec3(property.properties, index);
