@@ -14,6 +14,7 @@
 #include <QtCore/QThread>
 
 #include <FBXBaker.h>
+#include <OBJBaker.h>
 #include <PathUtils.h>
 
 BakeAssetTask::BakeAssetTask(const AssetHash& assetHash, const AssetPath& assetPath, const QString& filePath) :
@@ -33,6 +34,10 @@ void BakeAssetTask::run() {
     if (_assetPath.endsWith(".fbx")) {
         _baker = std::unique_ptr<FBXBaker> {
             new FBXBaker(QUrl("file:///" + _filePath), fn, PathUtils::generateTemporaryDir())
+        };
+    } else if (_assetPath.endsWith(".obj")) {
+        _baker = std::unique_ptr<OBJBaker>{
+            new OBJBaker(QUrl("file:///" + _filePath), fn, PathUtils::generateTemporaryDir())
         };
     } else {
         _baker = std::unique_ptr<TextureBaker> {

@@ -51,6 +51,7 @@ private:
     void loadOBJ();
     
     QUrl _objURL;
+    QUrl _url;
     QString _bakedOBJFilePath;
     QString _bakedOutputDir;
     QString _originalOutputDir;
@@ -61,7 +62,7 @@ private:
     QMultiHash<QUrl, QSharedPointer<TextureBaker>> _bakingTextures;
 
 public:
-    void createFBXNodeTree(FBXNode* objRoot, FBXNode* dracoNode);
+    void createFBXNodeTree(FBXNode* objRoot, FBXGeometry* geometry);
 
 
 };

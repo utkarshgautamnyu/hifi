@@ -501,7 +501,6 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
     float scaleGuess = 1.0f;
 
     bool needsMaterialLibrary = false;
-
     _url = url;
     geometry.meshExtents.reset();
     geometry.meshes.append(FBXMesh());
@@ -536,7 +535,7 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
 
         QMap<QString, int> materialMeshIdMap;
         QVector<FBXMeshPart> fbxMeshParts;
-        
+
         for (int i = 0, meshPartCount = 0; i < mesh.parts.count(); i++, meshPartCount++) {
             FBXMeshPart& meshPart = mesh.parts[i];
             FaceGroup faceGroup = faceGroups[meshPartCount];
@@ -557,6 +556,7 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
                     // Do some of the material logic (which previously lived below) now.
                     // All the faces in the same group will have the same name and material.
                     QString groupMaterialName = face.materialName;
+
                     if (groupMaterialName.isEmpty() && specifiesUV) {
 #ifdef WANT_DEBUG
                         qCDebug(modelformat) << "OBJ Reader WARNING: " << url
@@ -654,16 +654,16 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
         }
 
         mesh.meshExtents.reset();
-        foreach(const glm::vec3& vertex, mesh.vertices) {
-            mesh.meshExtents.addPoint(vertex);
-            geometry.meshExtents.addPoint(vertex);
-        }
+foreach(const glm::vec3& vertex, mesh.vertices) {
+    mesh.meshExtents.addPoint(vertex);
+    geometry.meshExtents.addPoint(vertex);
+}
 
-        // Build the single mesh.
-        FBXReader::buildModelMesh(mesh, url.toString());
+// Build the single mesh.
+FBXReader::buildModelMesh(mesh, url.toString());
 
-        // fbxDebugDump(geometry);
-    } catch(const std::exception& e) {
+// fbxDebugDump(geometry);
+    } catch (const std::exception& e) {
         qCDebug(modelformat) << "OBJ reader fail: " << e.what();
     }
 
@@ -693,23 +693,24 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
         }
 
         if (!textName.isEmpty()) {
-            #ifdef WANT_DEBUG
+#ifdef WANT_DEBUG
             qCDebug(modelformat) << "OBJ Reader found a default texture: " << textName;
-            #endif
+#endif
             preDefinedMaterial.diffuseTextureFilename = textName;
-        }
+    }
         materials[SMART_DEFAULT_MATERIAL_NAME] = preDefinedMaterial;
     }
     if (needsMaterialLibrary) {
-        foreach (QString libraryName, librariesSeen.keys()) {
+        foreach(QString libraryName, librariesSeen.keys()) {
             // Throw away any path part of libraryName, and merge against original url.
             QUrl libraryUrl = _url.resolved(QUrl(libraryName).fileName());
+
             qCDebug(modelformat) << "OBJ Reader material library" << libraryName << "used in" << _url;
             bool success;
             QByteArray data;
             std::tie<bool, QByteArray>(success, data) = requestData(libraryUrl);
             if (success) {
-                QBuffer buffer { &data };
+                QBuffer buffer{ &data };
                 buffer.open(QIODevice::ReadOnly);
                 parseMaterialLibrary(&buffer);
             } else {
@@ -718,9 +719,12 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
         }
     }
 
-    foreach (QString materialID, materials.keys()) {
+    foreach(QString materialID, materials.keys()) {
+        
+        qCDebug(modelformat) << "materials" << materialID;
         OBJMaterial& objMaterial = materials[materialID];
         if (!objMaterial.used) {
+            qCDebug(modelformat) << "materials Not" << materialID;
             continue;
         }
         geometry.materials[materialID] = FBXMaterial(objMaterial.diffuseColor,
@@ -728,6 +732,7 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
                                                      glm::vec3(0.0f),
                                                      objMaterial.shininess,
                                                      objMaterial.opacity);
+       
         FBXMaterial& fbxMaterial = geometry.materials[materialID];
         fbxMaterial.materialID = materialID;
         fbxMaterial._material = std::make_shared<model::Material>();
@@ -751,7 +756,6 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
             modelMaterial->setOpacity(fbxMaterial.opacity);
         }
     }
-
 
     return geometryPtr;
 }

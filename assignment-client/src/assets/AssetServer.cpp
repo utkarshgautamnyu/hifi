@@ -49,9 +49,10 @@ static const int INTERFACE_RUNNING_CHECK_FREQUENCY_MS = 1000;
 
 const QString ASSET_SERVER_LOGGING_TARGET_NAME = "asset-server";
 
-static const QStringList BAKEABLE_MODEL_EXTENSIONS = { "fbx" };
+static const QStringList BAKEABLE_MODEL_EXTENSIONS = { "fbx", "obj" };
 static QStringList BAKEABLE_TEXTURE_EXTENSIONS;
 static const QString BAKED_MODEL_SIMPLE_NAME = "asset.fbx";
+static const QString BAKED_OBJ_SIMPLE_NAME = "asset.obj";
 static const QString BAKED_TEXTURE_SIMPLE_NAME = "texture.ktx";
 
 void AssetServer::bakeAsset(const AssetHash& assetHash, const AssetPath& assetPath, const QString& filePath) {
@@ -96,7 +97,11 @@ std::pair<BakingStatus, QString> AssetServer::getAssetStatus(const AssetPath& pa
     QString bakedFilename;
 
     if (BAKEABLE_MODEL_EXTENSIONS.contains(extension)) {
-        bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+        if (extension == "obj") {
+            bakedFilename = BAKED_OBJ_SIMPLE_NAME;
+        } else {
+            bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+        }        
     } else if (BAKEABLE_TEXTURE_EXTENSIONS.contains(extension.toLocal8Bit()) && hasMetaFile(hash)) {
         bakedFilename = BAKED_TEXTURE_SIMPLE_NAME;
     } else {
@@ -183,7 +188,11 @@ bool AssetServer::needsToBeBaked(const AssetPath& path, const AssetHash& assetHa
     }
 
     if (BAKEABLE_MODEL_EXTENSIONS.contains(extension)) {
-        bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+        if (extension == "obj") {
+            bakedFilename = BAKED_OBJ_SIMPLE_NAME;
+        } else {
+            bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+        }
     } else if (loaded && BAKEABLE_TEXTURE_EXTENSIONS.contains(extension.toLocal8Bit())) {
         bakedFilename = BAKED_TEXTURE_SIMPLE_NAME;
     } else {
@@ -485,7 +494,11 @@ void AssetServer::handleGetMappingOperation(ReceivedMessage& message, SharedNode
         QString bakedRootFile;
 
         if (BAKEABLE_MODEL_EXTENSIONS.contains(assetPathExtension)) {
-            bakedRootFile = BAKED_MODEL_SIMPLE_NAME;
+            if (assetPathExtension == "obj") {
+                bakedRootFile = BAKED_OBJ_SIMPLE_NAME;
+            } else {
+                bakedRootFile = BAKED_MODEL_SIMPLE_NAME;
+            }
         } else if (BAKEABLE_TEXTURE_EXTENSIONS.contains(assetPathExtension.toLocal8Bit())) {
             bakedRootFile = BAKED_TEXTURE_SIMPLE_NAME;
         }
@@ -1140,6 +1153,7 @@ bool AssetServer::renameMapping(AssetPath oldPath, AssetPath newPath) {
 }
 
 static const QString BAKED_ASSET_SIMPLE_FBX_NAME = "asset.fbx";
+static const QString BAKED_ASSET_SIMPLE_OBJ_NAME = "asset.obj";
 static const QString BAKED_ASSET_SIMPLE_TEXTURE_NAME = "texture.ktx";
 
 QString getBakeMapping(const AssetHash& hash, const QString& relativeFilePath) {
@@ -1208,6 +1222,8 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
                 // for an FBX file, we replace the filename with the simple name
                 // (to handle the case where two mapped assets have the same hash but different names)
                 relativeFilePath = BAKED_ASSET_SIMPLE_FBX_NAME;
+            } else if (relativeFilePath.endsWith(".obj", Qt::CaseInsensitive)) {
+                relativeFilePath = BAKED_ASSET_SIMPLE_OBJ_NAME;
             } else if (!originalAssetPath.endsWith(".fbx", Qt::CaseInsensitive)) {
                 relativeFilePath = BAKED_ASSET_SIMPLE_TEXTURE_NAME;
 
@@ -1350,7 +1366,11 @@ bool AssetServer::setBakingEnabled(const AssetPathList& paths, bool enabled) {
             QString bakedFilename;
     
             if (BAKEABLE_MODEL_EXTENSIONS.contains(extension)) {
-                bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+                if (extension == "obj") {
+                    bakedFilename = BAKED_OBJ_SIMPLE_NAME;
+                } else {
+                    bakedFilename = BAKED_MODEL_SIMPLE_NAME;
+                }
             } else if (BAKEABLE_TEXTURE_EXTENSIONS.contains(extension.toLocal8Bit()) && hasMetaFile(hash)) {
                 bakedFilename = BAKED_TEXTURE_SIMPLE_NAME;
             } else {
