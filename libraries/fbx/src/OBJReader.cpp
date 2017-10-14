@@ -540,9 +540,11 @@ FBXGeometry* OBJReader::readOBJ(QByteArray& model, const QVariantHash& mapping, 
             FBXMeshPart& meshPart = mesh.parts[i];
             FaceGroup faceGroup = faceGroups[meshPartCount];
             bool specifiesUV = false;
+
             foreach(OBJFace face, faceGroup) {
                 // Go through all of the OBJ faces and determine the number of different materials necessary (each different material will be a unique mesh).
                 // NOTE (trent/mittens 3/30/17): this seems hardcore wasteful and is slowed down a bit by iterating through the face group twice, but it's the best way I've thought of to hack multi-material support in an OBJ into this pipeline.
+                
                 if (!materialMeshIdMap.contains(face.materialName)) {
                     // Create a new FBXMesh for this material mapping.
                     materialMeshIdMap.insert(face.materialName, materialMeshIdMap.count());
@@ -720,11 +722,8 @@ FBXReader::buildModelMesh(mesh, url.toString());
     }
 
     foreach(QString materialID, materials.keys()) {
-        
-        qCDebug(modelformat) << "materials" << materialID;
         OBJMaterial& objMaterial = materials[materialID];
         if (!objMaterial.used) {
-            qCDebug(modelformat) << "materials Not" << materialID;
             continue;
         }
         geometry.materials[materialID] = FBXMaterial(objMaterial.diffuseColor,

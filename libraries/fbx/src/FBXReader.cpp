@@ -846,7 +846,7 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
                             // trim the name from the timestamp
                             QString name = QString(subobject.properties.at(0).toByteArray());
                             name = name.left(name.indexOf('['));
-                            qDebug() << "Filename" << name;
+                            qDebug() << "FilenameHere" << name;
                             _textureNames.insert(getID(object.properties), name);
                         } else if (subobject.name == "Texture_Alpha_Source" && subobject.properties.length() >= TEXTURE_ALPHA_SOURCE_MIN_SIZE) {
                             tex.assign<uint8_t>(tex.alphaSource, subobject.properties.at(0).value<int>());
@@ -1100,7 +1100,6 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
                     }
                     material.materialID = getID(object.properties);
                     _fbxMaterials.insert(material.materialID, material);
-
 
                 } else if (object.name == "NodeAttribute") {
 #if defined(DEBUG_FBXREADER)
@@ -1511,7 +1510,6 @@ FBXGeometry* FBXReader::extractFBXGeometry(const QVariantHash& mapping, const QS
 
     for (QMap<QString, ExtractedMesh>::iterator it = meshes.begin(); it != meshes.end(); it++) {
         ExtractedMesh& extracted = it.value();
-
         extracted.mesh.meshExtents.reset();
 
         // accumulate local transforms

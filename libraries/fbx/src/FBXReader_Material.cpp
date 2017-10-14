@@ -310,7 +310,7 @@ void FBXReader::consolidateFBXMaterials(const QVariantHash& mapping) {
             }
         }
         qCDebug(modelformat) << " fbx material Name:" << material.name;
-
+        
         if (materialMap.contains(material.name)) {
             QJsonObject materialOptions = materialMap.value(material.name).toObject();
             qCDebug(modelformat) << "Mapping fbx material:" << material.name << " with HifiMaterial: " << materialOptions;
@@ -334,4 +334,6 @@ void FBXReader::consolidateFBXMaterials(const QVariantHash& mapping) {
             material._material->setOpacity(material.opacity);
         }
     }
+
+    
 }

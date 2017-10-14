@@ -23,6 +23,7 @@
 #include "TextureBaker.h"
 #include <FBX.h>
 #include "ModelBakingLoggingCategory.h"
+#include "ModelBaker.h"
 
 using TextureBakerThreadGetter = std::function<QThread*()>;
 
@@ -57,13 +58,22 @@ private:
     QString _originalOutputDir;
     QDir _tempDir;
     QString _originalOBJFilePath;
+    qlonglong _geometryID;
+    qlonglong _modelID;
+    std::vector<qlonglong> _materialIDs;
+    qlonglong _textureID;
+    qlonglong _videoID;
+    qlonglong _textureID1;
     
     TextureBakerThreadGetter _textureThreadGetter;
     QMultiHash<QUrl, QSharedPointer<TextureBaker>> _bakingTextures;
+    FBXNode objectNode;
+    ModelBaker _baker;
 
 public:
     void createFBXNodeTree(FBXNode* objRoot, FBXGeometry* geometry);
-
+    void setProperties(FBXNode * parentNode);
+    void setMaterialNodeProperties(FBXNode* materialNode, QString material, FBXGeometry* geometry);
 
 };
 #endif // !hifi_OBJBaker_h

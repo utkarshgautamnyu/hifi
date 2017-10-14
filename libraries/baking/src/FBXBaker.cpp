@@ -32,6 +32,7 @@
 #include "TextureBaker.h"
 
 #include "FBXBaker.h"
+#include "ModelBaker.h"
 
 #ifdef _WIN32
 #pragma warning( push )
@@ -242,6 +243,7 @@ void FBXBaker::importScene() {
     _rootNode = reader._rootNode = reader.parseFBX(&fbxFile);
     _geometry = reader.extractFBXGeometry({}, _fbxURL.toString());
     _textureContent = reader._textureContent;
+   
 }
 
 QString texturePathRelativeToFBX(QUrl fbxURL, QUrl textureURL) {
@@ -333,6 +335,8 @@ void FBXBaker::rewriteAndBakeSceneModels() {
 
                     // TODO Pull this out of _geometry instead so we don't have to reprocess it
                     auto extractedMesh = FBXReader::extractMesh(objectChild, meshIndex, false);
+                    //ModelBaker baker;
+                    //FBXNode dracoMeshNode = baker.compressMesh(extractedMesh, hasDeformers);
                     auto& mesh = extractedMesh.mesh;
 
                     if (mesh.wasCompressed) {
@@ -366,7 +370,8 @@ void FBXBaker::rewriteAndBakeSceneModels() {
                     bool hasColors { mesh.colors.size() > 0 };
                     bool hasTexCoords { mesh.texCoords.size() > 0 };
                     bool hasTexCoords1 { mesh.texCoords1.size() > 0 };
-                    bool hasPerFaceMaterials { mesh.parts.size() > 1 };
+                    bool hasPerFaceMaterials{ mesh.parts.size() > 1
+                        || extractedMesh.partMaterialTextures[0].first != 0 };
                     bool needsOriginalIndices { hasDeformers };
 
                     int normalsAttributeID { -1 };
@@ -406,14 +411,13 @@ void FBXBaker::rewriteAndBakeSceneModels() {
                             (draco::GeometryAttribute::Type)DRACO_ATTRIBUTE_MATERIAL_ID,
                             1, draco::DT_UINT16);
                     }
-
-
+                    
                     auto partIndex = 0;
                     draco::FaceIndex face;
                     for (auto& part : mesh.parts) {
                         const auto& matTex = extractedMesh.partMaterialTextures[partIndex];
                         uint16_t materialID = matTex.first;
-
+                        
                         auto addFace = [&](QVector<int>& indices, int index, draco::FaceIndex face) {
                             int32_t idx0 = indices[index];
                             int32_t idx1 = indices[index + 1];
@@ -596,8 +600,9 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
                             if (!textureFileInfo.filePath().isEmpty()) {
                                 // check if this was an embedded texture we have already have in-memory content for
                                 auto textureContent = _textureContent.value(fbxTextureFileName.toLocal8Bit());
-
+                                qCDebug(model_baking) << "TextureContent" << textureContent;
                                 // figure out the URL to this texture, embedded or external
+                                
                                 auto urlToTexture = getTextureURL(textureFileInfo, fbxTextureFileName,
                                                                   !textureContent.isNull());
 
@@ -629,7 +634,6 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
                                     // texture type from the loaded materials
                                     QString textureID { object->properties[0].toByteArray() };
                                     auto textureType = textureTypes[textureID];
-
                                     // bake this texture asynchronously
                                     bakeTexture(urlToTexture, textureType, _bakedOutputDir, bakedTextureFileName, textureContent);
                                 }
@@ -773,7 +777,6 @@ void FBXBaker::exportScene() {
     _bakedFBXFilePath = _bakedOutputDir + "/" + bakedFilename;
 
     auto fbxData = FBXWriter::encodeFBX(_rootNode);
-    qCDebug(model_baking) << "data" << fbxData;
     QFile bakedFile(_bakedFBXFilePath);
 
     if (!bakedFile.open(QIODevice::WriteOnly)) {
