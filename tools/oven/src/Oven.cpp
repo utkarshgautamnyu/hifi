@@ -20,6 +20,12 @@
 #include "Oven.h"
 #include "BakerCLI.h"
 
+#include <DependencyManager.h>
+#include <ResourceManager.h>
+#include <NodeList.h>
+#include <AddressManager.h>
+#include <StatTracker.h>
+
 static const QString OUTPUT_FOLDER = "/Users/birarda/code/hifi/lod/test-oven/export";
 
 static const QString CLI_INPUT_PARAMETER = "i";
@@ -69,6 +75,11 @@ Oven::Oven(int argc, char* argv[]) :
         _mainWindow = new OvenMainWindow;
         _mainWindow->show();
     }
+    // Initialize classes from Dependency Manager for OBJ Baker
+    DependencyManager::set<StatTracker>();
+    DependencyManager::set<AddressManager>();
+    DependencyManager::set<NodeList>(NodeType::Unassigned, -1);
+    DependencyManager::set<ResourceManager>();
 }
 
 Oven::~Oven() {

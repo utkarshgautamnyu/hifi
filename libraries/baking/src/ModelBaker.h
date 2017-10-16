@@ -19,7 +19,7 @@
 #include <gpu/Texture.h> 
 
 using TextureBakerThreadGetter = std::function<QThread*()>;
-
+using getMaterialIDCallback = std::function <int(int)>;
 class ModelBaker : public Baker {
     Q_OBJECT
 
@@ -28,8 +28,8 @@ public slots:
 
 public:
     ModelBaker();
-    FBXNode compressMesh(ExtractedMesh& extractedMesh, bool hasDeformers);
-    QByteArray compressTexture(QString textureFileName, QUrl modelUrl, QString bakedOutputDir, TextureBakerThreadGetter textureThreadGetter, const QString& originalOutputDir = "");
+    FBXNode* compressMesh(FBXMesh& mesh, bool hasDeformers, getMaterialIDCallback callback = NULL);
+    QByteArray* compressTexture(QString textureFileName, QUrl modelUrl, QString bakedOutputDir, TextureBakerThreadGetter textureThreadGetter, const QString& originalOutputDir = "");
     QString createBakedTextureFileName(const QFileInfo & textureFileInfo);
 private:
     QHash<QString, int> _textureNameMatchCount;
