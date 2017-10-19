@@ -30,6 +30,7 @@
 
 #include <ClientServerUtils.h>
 #include <FBXBaker.h>
+#include <ModelBaker.h>
 #include <NodeType.h>
 #include <SharedUtil.h>
 #include <PathUtils.h>
@@ -39,6 +40,11 @@
 #include "SendAssetTask.h"
 #include "UploadAssetTask.h"
 
+#include <DependencyManager.h>
+#include <ResourceManager.h>
+#include <NodeList.h>
+#include <AddressManager.h>
+#include <StatTracker.h>
 
 static const uint8_t MIN_CORES_FOR_MULTICORE = 4;
 static const uint8_t CPU_AFFINITY_COUNT_HIGH = 2;
@@ -52,10 +58,10 @@ const QString ASSET_SERVER_LOGGING_TARGET_NAME = "asset-server";
 static const QStringList BAKEABLE_MODEL_EXTENSIONS = { "fbx", "obj" };
 static QStringList BAKEABLE_TEXTURE_EXTENSIONS;
 static const QString BAKED_MODEL_SIMPLE_NAME = "asset.fbx";
-static const QString BAKED_OBJ_SIMPLE_NAME = "asset.obj";
+static const QString BAKED_OBJ_SIMPLE_NAME = "asset.fbx";
 static const QString BAKED_TEXTURE_SIMPLE_NAME = "texture.ktx";
 
-void AssetServer::bakeAsset(const AssetHash& assetHash, const AssetPath& assetPath, const QString& filePath) {
+void AssetServer::bakeAsset(const AssetHash& assetHash, const AssetPath& assetPath, const QString& filePath) {  
     qDebug() << "Starting bake for: " << assetPath << assetHash;
     auto it = _pendingBakes.find(assetHash);
     if (it == _pendingBakes.end()) {
@@ -239,6 +245,10 @@ AssetServer::AssetServer(ReceivedMessage& message) :
     _transferTaskPool(this),
     _bakingTaskPool(this)
 {
+    /*DependencyManager::set<StatTracker>();
+    DependencyManager::set<AddressManager>();
+    DependencyManager::set<NodeList>(NodeType::Unassigned, -1);*/
+    DependencyManager::set<ResourceManager>();
     // store the current state of image compression so we can reset it when this assignment is complete
     _wasColorTextureCompressionEnabled = image::isColorTexturesCompressionEnabled();
     _wasGrayscaleTextureCompressionEnabled = image::isGrayscaleTexturesCompressionEnabled();
@@ -1153,7 +1163,7 @@ bool AssetServer::renameMapping(AssetPath oldPath, AssetPath newPath) {
 }
 
 static const QString BAKED_ASSET_SIMPLE_FBX_NAME = "asset.fbx";
-static const QString BAKED_ASSET_SIMPLE_OBJ_NAME = "asset.obj";
+static const QString BAKED_ASSET_SIMPLE_OBJ_NAME = "asset.fbx";
 static const QString BAKED_ASSET_SIMPLE_TEXTURE_NAME = "texture.ktx";
 
 QString getBakeMapping(const AssetHash& hash, const QString& relativeFilePath) {
@@ -1181,7 +1191,9 @@ void AssetServer::handleCompletedBake(QString originalAssetHash, QString origina
     QString errorReason;
 
     qDebug() << "Completing bake for " << originalAssetHash;
-
+    for (auto& filePath : bakedFilePaths) {
+        qDebug() << "FilePaths" << filePath;
+    }
     for (auto& filePath : bakedFilePaths) {
         // figure out the hash for the contents of this file
         QFile file(filePath);

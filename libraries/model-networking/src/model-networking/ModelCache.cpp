@@ -533,6 +533,8 @@ NetworkMaterial::NetworkMaterial(const FBXMaterial& material, const QUrl& textur
     model::Material(*material._material)
 {
     _textures = Textures(MapChannel::NUM_MAP_CHANNELS);
+    qCDebug(modelnetworking) << "FileName Albedo" << material.albedoTexture.filename;
+    qCDebug(modelnetworking) << "FileName Occlusion" << material.occlusionTexture.filename;
     if (!material.albedoTexture.filename.isEmpty()) {
         auto map = fetchTextureMap(textureBaseUrl, material.albedoTexture, image::TextureUsage::ALBEDO_TEXTURE, MapChannel::ALBEDO_MAP);
         _albedoTransform = material.albedoTexture.transform;

@@ -32,7 +32,6 @@
 #include "TextureBaker.h"
 
 #include "FBXBaker.h"
-#include "ModelBaker.h"
 
 #ifdef _WIN32
 #pragma warning( push )
@@ -52,9 +51,19 @@ FBXBaker::FBXBaker(const QUrl& fbxURL, TextureBakerThreadGetter textureThreadGet
     _fbxURL(fbxURL),
     _bakedOutputDir(bakedOutputDir),
     _originalOutputDir(originalOutputDir),
-    _textureThreadGetter(textureThreadGetter)
-{
+    _textureThreadGetter(textureThreadGetter) {
 
+}
+
+FBXBaker::~FBXBaker() {
+    if (_tempDir.exists()) {
+        if (!_tempDir.remove(_originalFBXFilePath)) {
+            qCWarning(model_baking) << "Failed to remove temporary copy of fbx file:" << _originalFBXFilePath;
+        }
+        if (!_tempDir.rmdir(".")) {
+            qCWarning(model_baking) << "Failed to remove temporary directory:" << _tempDir;
+        }
+    }
 }
 
 void FBXBaker::abort() {
@@ -69,7 +78,7 @@ void FBXBaker::abort() {
 
 void FBXBaker::bake() {
     qDebug() << "FBXBaker" << _fbxURL << "bake starting";
-    
+
     auto tempDir = PathUtils::generateTemporaryDir();
 
     if (tempDir.isEmpty()) {
@@ -152,7 +161,7 @@ void FBXBaker::loadSourceFBX() {
     // check if the FBX is local or first needs to be downloaded
     if (_fbxURL.isLocalFile()) {
         // load up the local file
-        QFile localFBX { _fbxURL.toLocalFile() };
+        QFile localFBX{ _fbxURL.toLocalFile() };
 
         qDebug() << "Local file url: " << _fbxURL << _fbxURL.toString() << _fbxURL.toLocalFile() << ", copying to: " << _originalFBXFilePath;
 
@@ -243,7 +252,6 @@ void FBXBaker::importScene() {
     _rootNode = reader._rootNode = reader.parseFBX(&fbxFile);
     _geometry = reader.extractFBXGeometry({}, _fbxURL.toString());
     _textureContent = reader._textureContent;
-   
 }
 
 QString texturePathRelativeToFBX(QUrl fbxURL, QUrl textureURL) {
@@ -264,7 +272,7 @@ QString FBXBaker::createBakedTextureFileName(const QFileInfo& textureFileInfo) {
     // in case another texture referenced by this model has the same base name
     auto& nameMatches = _textureNameMatchCount[textureFileInfo.baseName()];
 
-    QString bakedTextureFileName { textureFileInfo.completeBaseName() };
+    QString bakedTextureFileName{ textureFileInfo.completeBaseName() };
 
     if (nameMatches > 0) {
         // there are already nameMatches texture with this name
@@ -288,7 +296,7 @@ QUrl FBXBaker::getTextureURL(const QFileInfo& textureFileInfo, QString relativeF
 
     if (isEmbedded) {
         urlToTexture = _fbxURL.toString() + "/" + apparentRelativePath.filePath();
-    } else  {
+    } else {
         if (textureFileInfo.exists() && textureFileInfo.isFile()) {
             // set the texture URL to the local texture that we have confirmed exists
             urlToTexture = QUrl::fromLocalFile(textureFileInfo.absoluteFilePath());
@@ -314,7 +322,7 @@ QUrl FBXBaker::getTextureURL(const QFileInfo& textureFileInfo, QString relativeF
 
 void FBXBaker::rewriteAndBakeSceneModels() {
     unsigned int meshIndex = 0;
-    bool hasDeformers { false };
+    bool hasDeformers{ false };
     for (FBXNode& rootChild : _rootNode.children) {
         if (rootChild.name == "Objects") {
             for (FBXNode& objectChild : rootChild.children) {
@@ -335,13 +343,16 @@ void FBXBaker::rewriteAndBakeSceneModels() {
 
                     // TODO Pull this out of _geometry instead so we don't have to reprocess it
                     auto extractedMesh = FBXReader::extractMesh(objectChild, meshIndex, false);
-                    ModelBaker baker;
+                    
                     getMaterialIDCallback callback = [extractedMesh](int partIndex) {return extractedMesh.partMaterialTextures[partIndex].first;};
-                    FBXNode* dracoMeshNode = baker.compressMesh(extractedMesh.mesh, hasDeformers, callback);
-                    // if dracoMeshNode is null continue
+                    
+                    FBXNode* dracoMeshNode = this->compressMesh(extractedMesh.mesh, hasDeformers, callback);
+                    
+                    // if dracoMeshNode is null (i.e error occurred while baking), continue
                     if (!dracoMeshNode) {
                         continue;
                     }
+
                     objectChild.children.push_back(*dracoMeshNode);
 
                     static const std::vector<QString> nodeNamesToDelete {
@@ -420,60 +431,76 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
                         if (textureChild.name == "RelativeFilename") {
 
                             // use QFileInfo to easily split up the existing texture filename into its components
-                            QString fbxTextureFileName { textureChild.properties.at(0).toByteArray() };
-                            QFileInfo textureFileInfo { fbxTextureFileName.replace("\\", "/") };
+                            QString fbxTextureFileName{ textureChild.properties.at(0).toByteArray() };
 
-                            if (textureFileInfo.suffix() == BAKED_TEXTURE_EXT.mid(1)) {
-                                // re-baking an FBX that already references baked textures is a fail
-                                // so we add an error and return from here
-                                handleError("Cannot re-bake a file that references compressed textures");
+                            
+                            getTextureContentTypeCallback textureContentTypeCallback = [=]() {
+                            QPair<QByteArray, image::TextureUsage::Type> result;
+                            result.first = _textureContent.value(fbxTextureFileName.toLocal8Bit());
+                            result.second = textureTypes[object->properties[0].toByteArray()];
+                            return result;
+                            };
 
-                                return;
-                            }
+                            
+                            // write the new filename into the FBX scene
+                            QByteArray* bakedTextureFile = this->compressTexture(fbxTextureFileName, _fbxURL, _bakedOutputDir, _textureThreadGetter, textureContentTypeCallback, _originalOutputDir);
+                            textureChild.properties[0] = *bakedTextureFile;
+                            qCDebug(model_baking) << "TextureChild" << textureChild.properties[0];
 
 
-                            // make sure this texture points to something and isn't one we've already re-mapped
-                            if (!textureFileInfo.filePath().isEmpty()) {
-                                // check if this was an embedded texture we have already have in-memory content for
-                                auto textureContent = _textureContent.value(fbxTextureFileName.toLocal8Bit());
-                                qCDebug(model_baking) << "TextureContent" << textureContent;
-                                // figure out the URL to this texture, embedded or external
-                                
-                                auto urlToTexture = getTextureURL(textureFileInfo, fbxTextureFileName,
-                                                                  !textureContent.isNull());
+                            //QFileInfo textureFileInfo{ fbxTextureFileName.replace("\\", "/") };
 
-                                QString bakedTextureFileName;
-                                if (_remappedTexturePaths.contains(urlToTexture)) {
-                                    bakedTextureFileName = _remappedTexturePaths[urlToTexture];
-                                } else {
-                                    // construct the new baked texture file name and file path
-                                    // ensuring that the baked texture will have a unique name
-                                    // even if there was another texture with the same name at a different path
-                                    bakedTextureFileName = createBakedTextureFileName(textureFileInfo);
-                                    _remappedTexturePaths[urlToTexture] = bakedTextureFileName;
-                                }
+                            //if (textureFileInfo.suffix() == BAKED_TEXTURE_EXT.mid(1)) {
+                            //    // re-baking an FBX that already references baked textures is a fail
+                            //    // so we add an error and return from here
+                            //    handleError("Cannot re-bake a file that references compressed textures");
 
-                                qCDebug(model_baking).noquote() << "Re-mapping" << fbxTextureFileName
-                                    << "to" << bakedTextureFileName;
+                            //    return;
+                            //}
 
-                                QString bakedTextureFilePath {
-                                    _bakedOutputDir + "/" + bakedTextureFileName
-                                };
 
-                                // write the new filename into the FBX scene
-                                textureChild.properties[0] = bakedTextureFileName.toLocal8Bit();
+                            //// make sure this texture points to something and isn't one we've already re-mapped
+                            //if (!textureFileInfo.filePath().isEmpty()) {
+                            //    // check if this was an embedded texture we have already have in-memory content for
+                            //    auto textureContent = _textureContent.value(fbxTextureFileName.toLocal8Bit());
 
-                                if (!_bakingTextures.contains(urlToTexture)) {
-                                    _outputFiles.push_back(bakedTextureFilePath);
+                            //    // figure out the URL to this texture, embedded or external
+                            //    auto urlToTexture = getTextureURL(textureFileInfo, fbxTextureFileName,
+                            //                                      !textureContent.isNull());
 
-                                    // grab the ID for this texture so we can figure out the
-                                    // texture type from the loaded materials
-                                    QString textureID { object->properties[0].toByteArray() };
-                                    auto textureType = textureTypes[textureID];
-                                    // bake this texture asynchronously
-                                    bakeTexture(urlToTexture, textureType, _bakedOutputDir, bakedTextureFileName, textureContent);
-                                }
-                            }
+                            //    QString bakedTextureFileName;
+                            //    if (_remappedTexturePaths.contains(urlToTexture)) {
+                            //        bakedTextureFileName = _remappedTexturePaths[urlToTexture];
+                            //    } else {
+                            //        // construct the new baked texture file name and file path
+                            //        // ensuring that the baked texture will have a unique name
+                            //        // even if there was another texture with the same name at a different path
+                            //        bakedTextureFileName = createBakedTextureFileName(textureFileInfo);
+                            //        _remappedTexturePaths[urlToTexture] = bakedTextureFileName;
+                            //    }
+
+                            //    qCDebug(model_baking).noquote() << "Re-mapping" << fbxTextureFileName
+                            //        << "to" << bakedTextureFileName;
+
+                            //    QString bakedTextureFilePath{
+                            //        _bakedOutputDir + "/" + bakedTextureFileName
+                            //    };
+
+                            //    // write the new filename into the FBX scene
+                            //    textureChild.properties[0] = bakedTextureFileName.toLocal8Bit();
+
+                            //    if (!_bakingTextures.contains(urlToTexture)) {
+                            //        _outputFiles.push_back(bakedTextureFilePath);
+                            //        qCDebug(model_baking) << "BakedTexturefilePath" << bakedTextureFilePath;
+                            //        // grab the ID for this texture so we can figure out the
+                            //        // texture type from the loaded materials
+                            //        QString textureID{ object->properties[0].toByteArray() };
+                            //        auto textureType = textureTypes[textureID];
+
+                            //        // bake this texture asynchronously
+                            //        bakeTexture(urlToTexture, textureType, _bakedOutputDir, bakedTextureFileName, textureContent);
+                            //    }
+                            //}
                         }
                     }
 
@@ -492,8 +519,9 @@ void FBXBaker::rewriteAndBakeSceneTextures() {
 
 void FBXBaker::bakeTexture(const QUrl& textureURL, image::TextureUsage::Type textureType,
                            const QDir& outputDir, const QString& bakedFilename, const QByteArray& textureContent) {
+    
     // start a bake for this texture and add it to our list to keep track of
-    QSharedPointer<TextureBaker> bakingTexture {
+    QSharedPointer<TextureBaker> bakingTexture{
         new TextureBaker(textureURL, textureType, outputDir, bakedFilename, textureContent),
         &TextureBaker::deleteLater
     };
@@ -533,7 +561,7 @@ void FBXBaker::handleBakedTexture() {
                         // check if we have a relative path to use for the texture
                         auto relativeTexturePath = texturePathRelativeToFBX(_fbxURL, bakedTexture->getTextureURL());
 
-                        QFile originalTextureFile {
+                        QFile originalTextureFile{
                             _originalOutputDir + "/" + relativeTexturePath + bakedTexture->getTextureURL().fileName()
                         };
 
@@ -613,6 +641,7 @@ void FBXBaker::exportScene() {
     _bakedFBXFilePath = _bakedOutputDir + "/" + bakedFilename;
 
     auto fbxData = FBXWriter::encodeFBX(_rootNode);
+
     QFile bakedFile(_bakedFBXFilePath);
 
     if (!bakedFile.open(QIODevice::WriteOnly)) {

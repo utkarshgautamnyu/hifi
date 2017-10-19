@@ -42,6 +42,7 @@ TextureBaker::TextureBaker(const QUrl& textureURL, image::TextureUsage::Type tex
 }
 
 void TextureBaker::bake() {
+    qCDebug(model_baking) << "Reached Texture Baking";
     // once our texture is loaded, kick off a the processing
     connect(this, &TextureBaker::originalTextureLoaded, this, &TextureBaker::processTexture);
 
@@ -74,7 +75,7 @@ void TextureBaker::loadTexture() {
     if (_textureURL.isLocalFile()) {
         // load up the local file
         QFile localTexture { _textureURL.toLocalFile() };
-
+        qCDebug(model_baking) << "LocalTextureFileName" << localTexture.fileName();
         if (!localTexture.open(QIODevice::ReadOnly)) {
             handleError("Unable to open texture " + _textureURL.toString());
             return;

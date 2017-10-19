@@ -1,21 +1,6 @@
 #include "ModelBaker.h"
-#include "Baker.h"
-
-#ifdef _WIN32
-#pragma warning( push )
-#pragma warning( disable : 4267 )
-#endif
-
-#include <draco/mesh/triangle_soup_mesh_builder.h>
-#include <draco/compression/encode.h>
-
-#ifdef _WIN32
-#pragma warning( pop )
-#endif
 
 #include <image\Image.h>
-#include <fstream>
-#include <iostream>
 
 #include <QtConcurrent>
 #include <QtCore/QCoreApplication>
@@ -38,8 +23,31 @@
 #include "TextureBaker.h"
 
 #include "FBXBaker.h"
-#include "ModelBaker.h"
+
+#ifdef _WIN32
+#pragma warning( push )
+#pragma warning( disable : 4267 )
+#endif
+
+#include <draco/mesh/triangle_soup_mesh_builder.h>
+#include <draco/compression/encode.h>
+
+#ifdef _WIN32
+#pragma warning( pop )
+#endif
+
 ModelBaker::ModelBaker() {}
+
+void ModelBaker::abort() {
+    Baker::abort();
+
+    // tell our underlying TextureBaker instances to abort
+    // the FBXBaker will wait until all are aborted before emitting its own abort signal
+    for (auto& textureBaker : _bakingTextures) {
+        textureBaker->abort();
+    }
+}
+
 void ModelBaker::bake() {}
 
 FBXNode* ModelBaker::compressMesh(FBXMesh& mesh, bool hasDeformers, getMaterialIDCallback callback) {
@@ -124,8 +132,6 @@ FBXNode* ModelBaker::compressMesh(FBXMesh& mesh, bool hasDeformers, getMaterialI
     uint16_t materialID;
     
     for (auto& part : mesh.parts) {
-        //const auto& matTex = extractedMesh.partMaterialTextures[partIndex];
-        //uint16_t materialID = matTex.first;
         if (callback) {
             materialID = callback(partIndex);
         } else {
@@ -224,12 +230,25 @@ FBXNode* ModelBaker::compressMesh(FBXMesh& mesh, bool hasDeformers, getMaterialI
     return &dracoMeshNode;
 }
 
-QByteArray* ModelBaker::compressTexture(QString modelTextureFileName, QUrl modelURL, QString bakedOutputDir, TextureBakerThreadGetter textureThreadGetter, const QString& originalOutputDir) {
+QByteArray* ModelBaker::compressTexture(QString modelTextureFileName, QUrl modelURL, QString bakedOutputDir, TextureBakerThreadGetter textureThreadGetter, 
+                                        getTextureContentTypeCallback textureContentTypeCallback, const QString& originalOutputDir) {
     _modelURL = modelURL;
     _textureThreadGetter = textureThreadGetter;
     _originalOutputDir = originalOutputDir;
+    qCDebug(model_baking) << "ReachedHEre";
     static QByteArray textureChild;
     
+    QPair<QByteArray, image::TextureUsage::Type> textureContentType;
+    
+    if (textureContentTypeCallback) {
+        textureContentType = textureContentTypeCallback();
+    } else {
+        textureContentType = QPair<QByteArray, image::TextureUsage::Type>(NULL, image::TextureUsage::Type::OCCLUSION_TEXTURE);
+    }
+    
+    QByteArray textureContent = textureContentType.first;
+    image::TextureUsage::Type textureType = textureContentType.second;
+
     QFileInfo modelTextureFileInfo{ modelTextureFileName.replace("\\", "/") };
     
     if (modelTextureFileInfo.suffix() == BAKED_TEXTURE_EXT.mid(1)) {
@@ -239,16 +258,12 @@ QByteArray* ModelBaker::compressTexture(QString modelTextureFileName, QUrl model
         return nullptr;
     }
 
-
     // make sure this texture points to something and isn't one we've already re-mapped
     if (!modelTextureFileInfo.filePath().isEmpty()) {
         // check if this was an embedded texture that we already have in-memory content for
         
-        //auto textureContent = _textureContent.value(modelTextureFileName.toLocal8Bit());
-        //*******Check this*******
         // figure out the URL to this texture, embedded or external
-        auto urlToTexture = getTextureURL(modelTextureFileInfo, modelTextureFileName, false);
-                    //                      !textureContent.isNull());
+        auto urlToTexture = getTextureURL(modelTextureFileInfo, modelTextureFileName, !textureContent.isNull());
 
         QString bakedTextureFileName;
         if (_remappedTexturePaths.contains(urlToTexture)) {
@@ -273,21 +288,21 @@ QByteArray* ModelBaker::compressTexture(QString modelTextureFileName, QUrl model
 
         if (!_bakingTextures.contains(urlToTexture)) {
             _outputFiles.push_back(bakedTextureFilePath);
-
+            qCDebug(model_baking) << "BakedTextureFilePath" << bakedTextureFilePath;
             // grab the ID for this texture so we can figure out the
             // texture type from the loaded materials
             //QString textureID{ object->properties[0].toByteArray() };
             //auto textureType = textureTypes[textureID];
-            auto textureType = image::TextureUsage::Type::OCCLUSION_TEXTURE;
+            //auto textureType = image::TextureUsage::Type::OCCLUSION_TEXTURE;
 
             // bake this texture asynchronously
-            QByteArray textureContent = "";
             bakeTexture(urlToTexture, textureType, bakedOutputDir, bakedTextureFileName, textureContent);
         }
     }
-
+   
     return &textureChild;
 }
+
 QUrl ModelBaker::getTextureURL(const QFileInfo& textureFileInfo, QString relativeFileName, bool isEmbedded) {
 
     QUrl urlToTexture;
@@ -322,6 +337,7 @@ QUrl ModelBaker::getTextureURL(const QFileInfo& textureFileInfo, QString relativ
 
 void ModelBaker::bakeTexture(const QUrl& textureURL, image::TextureUsage::Type textureType,
                            const QDir& outputDir, const QString& bakedFilename, const QByteArray& textureContent) {
+    
     // start a bake for this texture and add it to our list to keep track of
     QSharedPointer<TextureBaker> bakingTexture{
         new TextureBaker(textureURL, textureType, outputDir, bakedFilename, textureContent),
@@ -336,10 +352,8 @@ void ModelBaker::bakeTexture(const QUrl& textureURL, image::TextureUsage::Type t
     _bakingTextures.insert(textureURL, bakingTexture);
 
     // start baking the texture on one of our available worker threads
-    /*bakingTexture->moveToThread(_textureThreadGetter());
-    QMetaObject::invokeMethod(bakingTexture.data(), "bake");*/
-
-    bakingTexture->bake();
+    bakingTexture->moveToThread(_textureThreadGetter());
+    QMetaObject::invokeMethod(bakingTexture.data(), "bake");
 }
 
 void ModelBaker::handleBakedTexture() {
@@ -445,7 +459,7 @@ void ModelBaker::checkIfTexturesFinished() {
 
             return;
         } else {
-            qCDebug(model_baking) << "Finished baking, emitting finsihed" << _modelURL;
+            qCDebug(model_baking) << "Finished baking, emitting finished" << _modelURL;
 
             setIsFinished(true);
         }
@@ -490,4 +504,14 @@ QString ModelBaker::createBakedTextureFileName(const QFileInfo& textureFileInfo)
     ++nameMatches;
 
     return bakedTextureFileName;
+}
+
+void ModelBaker::setWasAborted(bool wasAborted) {
+    if (wasAborted != _wasAborted.load()) {
+        Baker::setWasAborted(wasAborted);
+
+        if (wasAborted) {
+            qCDebug(model_baking) << "Aborted baking" << _modelURL;
+        }
+    }
 }
