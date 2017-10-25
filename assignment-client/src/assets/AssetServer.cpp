@@ -526,6 +526,9 @@ void AssetServer::handleGetMappingOperation(ReceivedMessage& message, SharedNode
                     // we found a baked version of the requested asset to serve, redirect to that
                     redirectedAssetHash = bakedIt->second;
                     wasRedirected = true;
+                    if (bakedRootFile == BAKED_SCRIPT_SIMPLE_NAME) {
+                        wasRedirected = false;
+                    }
                 } else {
                     qDebug() << "Did not find baked version for: " << originalAssetHash << assetPath << " (disabled)";
                     bakingDisabled = true;
